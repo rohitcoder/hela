@@ -1,19 +1,34 @@
-mod cli;
-mod scanner;
+mod scans;
+mod utils;
 
-use cli::Cli;
-use scanner::Scanner;
+use std::env;
+use scans::scanner::ScanRunner;
+use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
 
 fn main() {
     // Parse command-line arguments
-    let cli = Cli::parse();
+    let args: Vec<String> = env::args().collect();
 
-    // Initialize scanner
-    let scanner = Scanner::new();
+    if args.len() < 2 {
+        println!("Please provide a scan type as an argument.");
+        return;
+    }
+
+    if args.len() < 3 {
+        println!("Please provide target for provided scan type.");
+        return;
+    }
+
+    // Initialize the scanner
+    let scanner = ScanRunner::new(
+        SastTool::new(),
+        ScaTool::new(),
+        SecretTool::new(),
+        LicenseTool::new(),
+    );
 
     // Execute the requested scan
-    match cli.command {
-        Some(command) => scanner.execute_scan(command),
-        None => println!("No command specified."),
-    }
+    let scan_type = &args[1];
+    let path = &args[2];
+    scanner.execute_scan(scan_type, path);
 }
