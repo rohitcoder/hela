@@ -7,8 +7,9 @@ use scans::scanner::ScanRunner;
 use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
 use actix_web::{App, HttpServer};
 use dotenv::dotenv;
+use argparse::{ArgumentParser, StoreTrue, Store};
 
-fn execute_scan(scan_type: &str, path: &str) {
+async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>) {
     let scanner = ScanRunner::new(
         SastTool::new(),
         ScaTool::new(),
@@ -16,10 +17,9 @@ fn execute_scan(scan_type: &str, path: &str) {
         LicenseTool::new(),
     );
 
-    scanner.execute_scan(scan_type, path);
+    scanner.execute_scan(scan_type, path, commit_id).await;
 }
 
-#[actix_web::main]
 async fn start_server() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
@@ -30,36 +30,71 @@ async fn start_server() -> std::io::Result<()> {
     .await
 }
 
-fn main() {
+#[actix_web::main]
+async fn main() {
     dotenv().ok();
     // Parse command-line arguments
-    let args: Vec<String> = env::args().collect();
+    let mut is_sast = false;
+    let mut is_sca = false;
+    let mut is_secret = false;
+    let mut is_license_compliance = false;
+    let mut is_start_server = false;
+    let mut verbose = false;
+    let mut path = String::new();
+    let mut commit_id = String::new();
 
-    if args.len() < 2 {
-        println!("Please provide a command.");
-        return;
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Scan CLI tool");
+        ap.refer(&mut verbose)
+            .add_option(&["-v", "--verbose"], StoreTrue, "Enable verbose mode!");
+        ap.refer(&mut path)
+            .add_option(&["-p", "--path"], Store, "Pass the path of the project to scan (Local Path or HTTP Git URL)");
+        ap.refer(&mut commit_id)
+            .add_option(&["-i", "--commit-id"], Store, "Pass the commit ID to scan (Optional)");
+        ap.refer(&mut is_sast)
+            .add_option(&["-s", "--sast"], StoreTrue, "Run SAST scan");
+        ap.refer(&mut is_sca)
+            .add_option(&["-c", "--sca"], StoreTrue, "Run SCA scan");
+        ap.refer(&mut is_secret)
+            .add_option(&["-e", "--secret"], StoreTrue, "Run Secret scan");
+        ap.refer(&mut is_license_compliance)
+            .add_option(&["-l", "--license-compliance"], StoreTrue, "Run License Compliance scan");
+        ap.refer(&mut is_start_server)
+            .add_option(&["-a", "--start-server"], StoreTrue, "Start API server");
+        ap.parse_args_or_exit();
     }
 
-    let command = &args[1];
+    if verbose {
+        println!("Verbose mode enabled!");
+    }
 
-    match command.as_str() {
-        "start-server" => {
-            println!("Starting API server...");
-            if let Err(err) = start_server() {
-                println!("Failed to start API server: {}", err);
-                exit(1)
-            }
-            println!("API server started successfully!");
+    if is_start_server {
+        println!("Starting API server...");
+        if let Err(err) = start_server().await {
+            println!("Failed to start API server: {}", err);
+            exit(1)
         }
-        "sast" | "sca" | "secret" | "license-compliance" => {
-            if args.len() < 3 {
-                println!("Please provide target for the provided scan type.");
-                return;
-            }
-            let scan_type = &args[1];
-            let path = &args[2];
-            execute_scan(scan_type, path);
-        }
-        _ => println!("Invalid command. Available commands: start-server, sast, sca, secret, license-compliance"),
+        println!("API server started successfully!");
+    }
+
+    if is_sast {
+        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+    }
+
+    if is_sca {
+        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+    }
+
+    if is_secret {
+        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+    }
+
+    if is_license_compliance {
+        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+    }
+
+    if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {
+        println!("Invalid command. Available commands: start-server, sast, sca, secret, license-compliance");
     }
 }

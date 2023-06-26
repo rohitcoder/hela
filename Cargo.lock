@@ -261,6 +261,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "argparse"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f8ebf5827e4ac4fd5946560e6a99776ea73b596d80898f357007317a7141e47"
+
+[[package]]
 name = "async-trait"
 version = "0.1.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -437,8 +443,10 @@ name = "code-security"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "argparse",
  "dotenv",
  "mongodb",
+ "rand",
  "serde",
  "serde_json",
  "structopt",

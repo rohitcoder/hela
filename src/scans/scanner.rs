@@ -17,11 +17,16 @@ impl ScanRunner {
         }
     }
 
-    pub fn execute_scan(&self, scan_type: &str, path: &str) {
+    pub async fn execute_scan(&self, scan_type: &str, path: &str, commit_id: Option<&str>) {
+        if let Some(commit_id) = commit_id {
+            println!("Commit ID: {}", commit_id);
+        }else {
+            println!("Commit ID: None");
+        }
         match scan_type {
-            "sast" => self.sast_tool.run_scan(path),
-            "sca" => self.sca_tool.run_scan(path),
-            "secret" => self.secret_tool.run_scan(path),
+            "sast" => self.sast_tool.run_scan(path, commit_id).await,
+            "sca" => self.sca_tool.run_scan(path, commit_id).await,
+            "secret" => self.secret_tool.run_scan(path, commit_id).await,
             "license-compliance" => self.license_tool.run_scan(path),
             _ => println!("Invalid scan type: {}", scan_type),
         }
