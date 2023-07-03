@@ -1,4 +1,6 @@
-use crate::utils::{common::execute_command, file_utils::find_files_recursively};
+use serde_json::json;
+
+use crate::utils::{common::{execute_command, post_json_data}, file_utils::find_files_recursively};
 
 pub struct ScaTool;
 
@@ -89,7 +91,7 @@ impl ScaTool {
         }
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>) {
         println!("Running SCA scan on path: {}", _path);
         
         let mut ignore_dirs = Vec::new();
@@ -101,8 +103,13 @@ impl ScaTool {
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 println!("Cloning git repo...");
-                let clone_command = format!("git clone {} /tmp/app", _path);
-                execute_command(&clone_command, true).await;
+                if let Some(_branch) = _branch {
+                    let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
+                    execute_command(&clone_command, true).await;
+                }else{
+                    let clone_command = format!("git clone {} /tmp/app", _path);
+                    execute_command(&clone_command, true).await;
+                }
             }else{
                 println!("Copying project to /tmp/app...");
                 let copy_command = format!("cp -r {} /tmp/app", _path);
@@ -125,13 +132,20 @@ impl ScaTool {
         self.install_project_dependencies(&_path, ignore_dirs.clone()).await;
         println!("Running SCA scan on path: {}", _path);
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
-        println!("Found manifests: {:?}", manifests);
+        //println!("Found manifests: {:?}", manifests);
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let sca_command = format!("cd {} && osv-scanner --format json -L {}", folder_path, file_name);
             let sca_output = execute_command(&sca_command, true).await;
-            println!("Sca output: {}", sca_output);
+            let json_output = json!(sca_output);
+            let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
+            let post_data = post_json_data(&post_link, json_output).await;
+            if post_data.get("status").unwrap() == "200 OK" {
+                println!("Successfully posted SCA scan data to server!");
+            }else{
+                println!("Error while posting SCA scan data to server!");
+            }
         }
     }
 }

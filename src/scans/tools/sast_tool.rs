@@ -1,4 +1,6 @@
-use crate::utils::common::{execute_command, print_error};
+use serde_json::json;
+
+use crate::utils::common::{execute_command, print_error, post_json_data};
 
 pub struct SastTool;
 
@@ -7,13 +9,18 @@ impl SastTool {
         SastTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>) {
         println!("Running SAST scan on path: {}", _path);
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 println!("Cloning git repo...");
-                let clone_command = format!("git clone {} /tmp/app", _path);
-                execute_command(&clone_command, true).await;
+                if let Some(_branch) = _branch {
+                    let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
+                    execute_command(&clone_command, true).await;
+                }else{
+                    let clone_command = format!("git clone {} /tmp/app", _path);
+                    execute_command(&clone_command, true).await;
+                }
             }else{
                 println!("Copying project to /tmp/app...");
                 let copy_command = format!("cp -r {} /tmp/app", _path);
@@ -64,7 +71,14 @@ impl SastTool {
         let json_output = std::fs::read_to_string("/tmp/sast_output.json").expect("Error reading file");
         let json_output: serde_json::Value = serde_json::from_str(&json_output).expect("Error parsing JSON");
         println!("SAST Scanner Results:");
-        println!("{:?}", json_output);
+        let json_output = json!(json_output);
+        let post_link = format!("{}/sast", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
+        let post_data = post_json_data(&post_link, json_output).await;
+        if post_data.get("status").unwrap() == "200 OK" {
+            println!("Successfully posted SAST scan data to server!");
+        }else{
+            println!("Error while posting SAST scan data to server!");
+        }
         
     }
 }

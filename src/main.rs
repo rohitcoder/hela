@@ -9,7 +9,7 @@ use actix_web::{App, HttpServer};
 use dotenv::dotenv;
 use argparse::{ArgumentParser, StoreTrue, Store};
 
-async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>) {
+async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>) {
     let scanner = ScanRunner::new(
         SastTool::new(),
         ScaTool::new(),
@@ -17,7 +17,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>) {
         LicenseTool::new(),
     );
 
-    scanner.execute_scan(scan_type, path, commit_id).await;
+    scanner.execute_scan(scan_type, path, commit_id, branch, server_url).await;
 }
 
 async fn start_server() -> std::io::Result<()> {
@@ -42,6 +42,8 @@ async fn main() {
     let mut verbose = false;
     let mut path = String::new();
     let mut commit_id = String::new();
+    let mut server_url = String::new();
+    let mut branch = String::new();
 
     {
         let mut ap = ArgumentParser::new();
@@ -52,8 +54,12 @@ async fn main() {
             .add_option(&["-p", "--path"], Store, "Pass the path of the project to scan (Local Path or HTTP Git URL)");
         ap.refer(&mut commit_id)
             .add_option(&["-i", "--commit-id"], Store, "Pass the commit ID to scan (Optional)");
+        ap.refer(&mut branch)
+            .add_option(&["-b", "--branch"], Store, "Pass the branch name to scan (Optional)");
         ap.refer(&mut is_sast)
             .add_option(&["-s", "--sast"], StoreTrue, "Run SAST scan");
+        ap.refer(&mut server_url)
+            .add_option(&["-u", "--server-url"], Store, "Pass the server URL to post scan results");
         ap.refer(&mut is_sca)
             .add_option(&["-c", "--sca"], StoreTrue, "Run SCA scan");
         ap.refer(&mut is_secret)
@@ -79,19 +85,19 @@ async fn main() {
     }
 
     if is_sast {
-        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
     }
 
     if is_sca {
-        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
     }
 
     if is_secret {
-        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
     }
 
     if is_license_compliance {
-        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }).await;
+        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
     }
 
     if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {
