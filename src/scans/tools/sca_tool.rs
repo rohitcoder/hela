@@ -1,4 +1,4 @@
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::utils::{common::{execute_command, post_json_data}, file_utils::find_files_recursively};
 
@@ -138,7 +138,10 @@ impl ScaTool {
             let folder_path = manifest.replace(file_name, "");
             let sca_command = format!("cd {} && osv-scanner --format json -L {}", folder_path, file_name);
             let sca_output = execute_command(&sca_command, true).await;
-            let json_output = json!(sca_output);
+            let json_output = serde_json::from_str::<serde_json::Value>(&sca_output).unwrap();
+            let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
+            let json_output = json_output[0].as_object().unwrap();
+            let json_output = Value::Object(json_output.clone());
             let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
             let post_data = post_json_data(&post_link, json_output).await;
             if post_data.get("status").unwrap() == "200 OK" {

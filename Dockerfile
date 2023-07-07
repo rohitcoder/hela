@@ -14,7 +14,7 @@ RUN cargo build --release \
 # Update the package list and upgrade the system
 RUN apt-get update && \
     apt-get -y upgrade
-
+    
 ## configure tzdata to avoid interactive prompt
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London
@@ -57,7 +57,8 @@ RUN \
   apt-get -y install --no-install-recommends sbt
 
 # Install npm
-RUN npm i license-checker --global
+RUN npm install -g @cyclonedx/cdxgen
+RUN export FETCH_LICENSE=true
 
 # Install gradle
 RUN wget https://services.gradle.org/distributions/gradle-7.0-bin.zip && \
