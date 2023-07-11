@@ -9,11 +9,15 @@ impl SastTool {
         SastTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>) {
-        println!("Running SAST scan on path: {}", _path);
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+        if verbose {
+            println!("[+] Running SAST scan on path: {}", _path);
+        }
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
-                println!("Cloning git repo...");
+                if verbose {
+                    println!("[+] Cloning git repo...");
+                }
                 if let Some(_branch) = _branch {
                     let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
                     execute_command(&clone_command, true).await;
@@ -22,7 +26,9 @@ impl SastTool {
                     execute_command(&clone_command, true).await;
                 }
             }else{
-                println!("Copying project to /tmp/app...");
+                if verbose {
+                    println!("[+] Copying project to /tmp/app...");
+                }
                 let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
@@ -39,7 +45,9 @@ impl SastTool {
 
         // if commit_id is provided then checkout to that commit id
         if let Some(commit_id) = _commit_id {
-            println!("Checking out to commit id: {}", commit_id);
+            if verbose {
+                println!("[+] Checking out to commit id: {}", commit_id);
+            }
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
             execute_command(&checkout_command, true).await;
 
@@ -53,7 +61,9 @@ impl SastTool {
 
         // clone repo https://github.com/rohitcodergroww/semgrep-rules to /tmp/sast-rules
         if !std::path::Path::new("/tmp/sast-rules").exists() {
-            println!("Cloning sast-rules repo...");
+            if verbose {
+                println!("[+] Cloning sast-rules repo...");
+            }
             let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
             execute_command(&clone_command, true).await;
         }
@@ -70,13 +80,27 @@ impl SastTool {
 
         let json_output = std::fs::read_to_string("/tmp/sast_output.json").expect("Error reading file");
         let json_output = serde_json::from_str::<serde_json::Value>(&json_output.to_string()).unwrap();
+        // pick results key from json_output
+        let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
         let post_link = format!("{}/sast", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-        let post_data = post_json_data(&post_link, json_output).await;
-        if post_data.get("status").unwrap() == "200 OK" {
-            println!("Successfully posted SAST scan data to server!");
-        }else{
-            println!("Error while posting SAST scan data to server!");
+
+        let post_data = post_json_data(&post_link, serde_json::Value::Array(json_output.clone())).await;
+         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+        // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+        let mut output_json = json!({});
+        if std::path::Path::new("/tmp/output.json").exists() {
+            let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+            output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
         }
-        
+        output_json["sast"] = serde_json::Value::Array(json_output.clone());
+
+        std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        if verbose {
+            if post_data.get("status").unwrap() == "200 OK" {
+                println!("Successfully posted SAST scan data to server!");
+            }else{
+                println!("Error while posting SAST scan data to server!");
+            }
+        }
     }
 }

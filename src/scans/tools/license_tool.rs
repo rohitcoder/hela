@@ -14,9 +14,10 @@ impl LicenseTool {
         LicenseTool
     }
     
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>) {
-        println!("Running License compliance scan on path: {}", _path);
-        
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+        if verbose {
+            println!("[+] Running License compliance scan on path: {}", _path);
+        }
         let mut ignore_dirs = Vec::new();
         ignore_dirs.push("node_modules");
         ignore_dirs.push("bin");
@@ -25,16 +26,20 @@ impl LicenseTool {
 
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
-                println!("Cloning git repo...");
+                if verbose {
+                    println!("[+] Cloning git repo...");
+                }
                 if let Some(_branch) = _branch {
                     let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
-                    execute_command(&clone_command, true).await;
+                    execute_command(&clone_command, false).await;
                 }else{
                     let clone_command = format!("git clone {} /tmp/app", _path);
-                    execute_command(&clone_command, true).await;
+                    execute_command(&clone_command, false).await;
                 }
             }else{
-                println!("Copying project to /tmp/app...");
+                if verbose {
+                    println!("[+] Copying project to /tmp/app...");
+                }
                 let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
@@ -42,24 +47,23 @@ impl LicenseTool {
         let mut _path = format!("/tmp/app");
         if let Some(commit_id) = _commit_id {
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
-            execute_command(&checkout_command, true).await;
+            execute_command(&checkout_command, false).await;
 
             let copy_command = format!("mkdir -p /tmp/new_code");
-            execute_command(&copy_command, true).await;
+            execute_command(&copy_command, false).await;
+
             let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/new_code", _path, commit_id, commit_id, commit_id);
-            execute_command(&copy_command, true).await;
+            execute_command(&copy_command, false).await;
             // now run secret scan on /tmp/new_code folder
             _path = format!("/tmp/new_code");
         }
-        
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
-        //println!("Found manifests: {:?}", manifests);
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let random_file_name = format!("{}.json", uuid::Uuid::new().to_string());
             let license_command = format!("cd {} && cdxgen -o {}", folder_path, random_file_name);
-            execute_command(&license_command, true).await;
+            execute_command(&license_command, false).await;
             // Read JSON file and parse data
             let license_json = std::fs::read_to_string(format!("{}/{}", folder_path, random_file_name)).unwrap();
             let json_data = serde_json::from_str::<serde_json::Value>(&license_json).unwrap();
@@ -80,11 +84,23 @@ impl LicenseTool {
                 component_licenses.insert(format!("{}@{}", component_name, component_version), license_names);
             }
             let post_link = format!("{}/license_data", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-            let post_data = post_json_data(&post_link, json!(component_licenses)).await;
-            if post_data.get("status").unwrap() == "200 OK" {
-                println!("Successfully posted SCA scan data to server!");
-            }else{
-                println!("Error while posting SCA scan data to server!");
+            
+            let post_data = post_json_data(&post_link, json!(component_licenses.clone())).await;
+             // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+            let mut output_json = json!({});
+            if std::path::Path::new("/tmp/output.json").exists() {
+                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+                output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
+            }
+            output_json["license"] = json!(component_licenses.clone());
+            std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+            if verbose {
+                if post_data.get("status").unwrap() == "200 OK" {
+                    println!("Successfully posted SCA scan data to server!");
+                }else{
+                    println!("Error while posting SCA scan data to server!");
+                }
             }
         }
     }

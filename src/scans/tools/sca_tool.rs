@@ -4,14 +4,16 @@ use crate::utils::{common::{execute_command, post_json_data}, file_utils::find_f
 
 pub struct ScaTool;
 
-pub static SUPPORTED_MANIFESTS : [&str; 2] = [
+pub static SUPPORTED_MANIFESTS : [&str; 3] = [
     "requirements.txt",
     "package-lock.json",
+    "pom.xml"
 ];
 
-pub static DETECT_MANIFESTS : [&str; 2] = [
+pub static DETECT_MANIFESTS : [&str; 3] = [
     "requirements.txt",
     "package.json",
+    "pom.xml"
 ];
 
 impl ScaTool {
@@ -19,7 +21,7 @@ impl ScaTool {
         ScaTool
     }
 
-    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>) {
+    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>, verbose: bool) {
         // detect if project is python or nodejs based on manifest from DETECT_MANIFESTS and install that
         // installation script for each language would be in /tmp/install/ folder with file like python.sh, javascript.sh, java.sh etc for each language, developer need to write that script and we will execute it here based on language detection
         let installation_script_path = format!("{}/install", std::env::temp_dir().to_str().unwrap());
@@ -42,24 +44,32 @@ impl ScaTool {
              let folder_path = detected_file.replace(file_name, "");
              let language = language_mapping.get(file_name).unwrap().to_string();
              if language == "python" {
-                 println!("Installing python dependencies...");
-                 let install_command = format!("cd {} && pip install -r {}", folder_path, file_name);
-                 execute_command(&install_command, true).await;
-                 // check if installation script exists for python and then execute it
-                 if std::path::Path::new(&format!("{}/python.sh", installation_script_path)).exists() {
-                    println!("[INFO] Found python installation script, executing it...");
+                if verbose {
+                    println!("[INFO] Found python manifest file, installing python dependencies...");
+                }
+                let install_command = format!("cd {} && pip install -r {}", folder_path, file_name);
+                execute_command(&install_command, true).await;
+                // check if installation script exists for python and then execute it
+                if std::path::Path::new(&format!("{}/python.sh", installation_script_path)).exists() {
+                    if verbose {
+                        println!("[INFO] Found python installation script, executing it...");
+                    }
                     let install_command = format!("cd {} && sh {}/python.sh", folder_path, installation_script_path);
                     execute_command(&install_command, true).await;
-                 }
+                }
              }
              if language == "javascript" {
                 // check if installation script exists for python and then execute it
                  if std::path::Path::new(&format!("{}/javascript.sh", installation_script_path)).exists() {
-                    println!("[INFO] Found javascript installation script, executing it...");
+                    if verbose {
+                        println!("[INFO] Found javascript installation script, executing it...");
+                    }
                     let install_command = format!("cd {} && sh {}/javascript.sh", folder_path, installation_script_path);
                     execute_command(&install_command, true).await;
                  }
-                 println!("Installing javascript dependencies...");
+                 if verbose {
+                    println!("Installing javascript dependencies...");
+                 }
                  let install_command = format!("cd {} && npm install --force --ignore-scripts", folder_path);
                  execute_command(&install_command, true).await;
              }
@@ -67,11 +77,15 @@ impl ScaTool {
              if language == "maven" {
                 // check if installation script exists for python and then execute it
                  if std::path::Path::new(&format!("{}/java.sh", installation_script_path)).exists() {
-                    println!("[INFO] Found java installation script, executing it...");
+                    if verbose {
+                        println!("[INFO] Found java installation script, executing it...");
+                    }
                     let install_command = format!("cd {} && sh {}/java.sh", folder_path, installation_script_path);
                     execute_command(&install_command, true).await;
                  }
-                 println!("Installing maven dependencies...");
+                if verbose {
+                    println!("Installing maven dependencies...");
+                }
                  let install_command = format!("cd {} && mvn install", folder_path);
                  execute_command(&install_command, true).await;
              }
@@ -79,21 +93,26 @@ impl ScaTool {
              if language == "gradle" {
                 // check if installation script exists for python and then execute it
                  if std::path::Path::new(&format!("{}/java.sh", installation_script_path)).exists() {
-                    println!("[INFO] Found java installation script, executing it...");
+                    if verbose {
+                        println!("[INFO] Found java installation script, executing it...");
+                    }
                     let install_command = format!("cd {} && sh {}/java.sh", folder_path, installation_script_path);
                     execute_command(&install_command, true).await;
                  }
-                 println!("Installing gradle dependencies...");
-                 let install_command = format!("cd {} && gradle build", folder_path);
-                 execute_command(&install_command, true).await;
+                if verbose {
+                    println!("Installing gradle dependencies...");
+                }
+                let install_command = format!("cd {} && gradle build", folder_path);
+                execute_command(&install_command, true).await;
              }
            }
         }
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>) {
-        println!("Running SCA scan on path: {}", _path);
-        
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+        if verbose {
+            println!("[+] Running SCA scan on path: {}", _path);
+        }
         let mut ignore_dirs = Vec::new();
         ignore_dirs.push("node_modules");
         ignore_dirs.push("bin");
@@ -102,7 +121,9 @@ impl ScaTool {
 
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
-                println!("Cloning git repo...");
+                if verbose {
+                    println!("[+] Cloning git repo...");
+                }
                 if let Some(_branch) = _branch {
                     let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
                     execute_command(&clone_command, true).await;
@@ -111,7 +132,9 @@ impl ScaTool {
                     execute_command(&clone_command, true).await;
                 }
             }else{
-                println!("Copying project to /tmp/app...");
+                if verbose {
+                    println!("[+] Copying project to /tmp/app...");
+                }
                 let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
@@ -128,9 +151,10 @@ impl ScaTool {
             // now run secret scan on /tmp/new_code folder
             _path = format!("/tmp/new_code");
         }
-        println!("Installing project dependencies...");
-        self.install_project_dependencies(&_path, ignore_dirs.clone()).await;
-        println!("Running SCA scan on path: {}", _path);
+        if verbose {
+            println!("[+] Installing project dependencies...");
+        }
+        self.install_project_dependencies(&_path, ignore_dirs.clone(), verbose).await;
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
         //println!("Found manifests: {:?}", manifests);
         for manifest in manifests.iter() {
@@ -143,11 +167,23 @@ impl ScaTool {
             let json_output = json_output[0].as_object().unwrap();
             let json_output = Value::Object(json_output.clone());
             let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-            let post_data = post_json_data(&post_link, json_output).await;
-            if post_data.get("status").unwrap() == "200 OK" {
-                println!("Successfully posted SCA scan data to server!");
-            }else{
-                println!("Error while posting SCA scan data to server!");
+
+            let post_data = post_json_data(&post_link, json_output.clone()).await;
+            // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+            let mut output_json = json!({});
+            if std::path::Path::new("/tmp/output.json").exists() {
+                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+                output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
+            }
+            output_json["sca"] = json_output.clone();
+            std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+            if verbose {
+                if post_data.get("status").unwrap() == "200 OK" {
+                    println!("Successfully posted SCA scan data to server!");
+                }else{
+                    println!("Error while posting SCA scan data to server!");
+                }
             }
         }
     }

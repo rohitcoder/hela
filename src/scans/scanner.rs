@@ -17,17 +17,20 @@ impl ScanRunner {
         }
     }
 
-    pub async fn execute_scan(&self, scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>) {
-        if let Some(commit_id) = commit_id {
-            println!("Commit ID: {}", commit_id);
-        }else {
-            println!("Commit ID: None");
+    pub async fn execute_scan(&self, scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, verbose: bool) {
+        if verbose {
+
+            if let Some(commit_id) = commit_id {
+                println!("Commit ID: {}", commit_id);
+            }else {
+                println!("Commit ID: None");
+            }
         }
         match scan_type {
-            "sast" => self.sast_tool.run_scan(path, commit_id, branch, server_url).await,
-            "sca" => self.sca_tool.run_scan(path, commit_id, branch, server_url).await,
-            "secret" => self.secret_tool.run_scan(path, commit_id, branch, server_url).await,
-            "license-compliance" => self.license_tool.run_scan(path, commit_id, branch, server_url).await,
+            "sast" => self.sast_tool.run_scan(path, commit_id, branch, server_url, verbose).await,
+            "sca" => self.sca_tool.run_scan(path, commit_id, branch, server_url, verbose).await,
+            "secret" => self.secret_tool.run_scan(path, commit_id, branch, server_url, verbose).await,
+            "license-compliance" => self.license_tool.run_scan(path, commit_id, branch, server_url, verbose).await,
             _ => println!("Invalid scan type: {}", scan_type),
         }
     }

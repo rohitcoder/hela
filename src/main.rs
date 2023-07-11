@@ -9,7 +9,7 @@ use actix_web::{App, HttpServer};
 use dotenv::dotenv;
 use argparse::{ArgumentParser, StoreTrue, Store};
 
-async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>) {
+async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, verbose: bool) {
     let scanner = ScanRunner::new(
         SastTool::new(),
         ScaTool::new(),
@@ -17,7 +17,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
         LicenseTool::new(),
     );
 
-    scanner.execute_scan(scan_type, path, commit_id, branch, server_url).await;
+    scanner.execute_scan(scan_type, path, commit_id, branch, server_url, verbose).await;
 }
 
 async fn start_server() -> std::io::Result<()> {
@@ -44,6 +44,7 @@ async fn main() {
     let mut commit_id = String::new();
     let mut server_url = String::new();
     let mut branch = String::new();
+    let mut json = false;
 
     {
         let mut ap = ArgumentParser::new();
@@ -66,13 +67,15 @@ async fn main() {
             .add_option(&["-e", "--secret"], StoreTrue, "Run Secret scan");
         ap.refer(&mut is_license_compliance)
             .add_option(&["-l", "--license-compliance"], StoreTrue, "Run License Compliance scan");
+        ap.refer(&mut json)
+            .add_option(&["-j", "--json"], StoreTrue, "Print JSON output");
         ap.refer(&mut is_start_server)
             .add_option(&["-a", "--start-server"], StoreTrue, "Start API server");
         ap.parse_args_or_exit();
     }
 
     if verbose {
-        println!("Verbose mode enabled!");
+        println!("[+] Verbose mode enabled!");
     }
 
     if is_start_server {
@@ -85,22 +88,29 @@ async fn main() {
     }
 
     if is_sast {
-        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
+        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
     }
 
     if is_sca {
-        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
+        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
     }
 
     if is_secret {
-        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
+        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
     }
 
     if is_license_compliance {
-        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }).await;
+        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
     }
 
     if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {
         println!("Invalid command. Available commands: start-server, sast, sca, secret, license-compliance");
+    }
+
+    if json {
+        if std::path::Path::new("/tmp/output.json").exists() {
+            let output = std::fs::read_to_string("/tmp/output.json").unwrap();
+            println!("{}", output);
+        }
     }
 }
