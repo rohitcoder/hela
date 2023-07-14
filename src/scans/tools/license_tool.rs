@@ -58,6 +58,7 @@ impl LicenseTool {
             _path = format!("/tmp/new_code");
         }
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
+        let mut manifest_license = HashMap::new();
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
@@ -69,7 +70,7 @@ impl LicenseTool {
             let json_data = serde_json::from_str::<serde_json::Value>(&license_json).unwrap();
             // extract license data from "components" key there will be list of components so grab licenses from there
             let components = json_data["components"].as_array().unwrap();
-            let mut component_licenses = HashMap::new();
+            let mut component_licenses: HashMap<String, Vec<String>> = HashMap::new();
             for component in components.iter() {
                 let component_name = component["name"].as_str().unwrap();
                 let component_version = component["version"].as_str().unwrap();
@@ -82,25 +83,25 @@ impl LicenseTool {
                     }
                 }
                 component_licenses.insert(format!("{}@{}", component_name, component_version), license_names);
+                manifest_license.insert(format!("{}/{}", folder_path, file_name), component_licenses.clone());
             }
-            let post_link = format!("{}/license_data", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-            
-            let post_data = post_json_data(&post_link, json!(component_licenses.clone())).await;
-             // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
-            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
-            let mut output_json = json!({});
-            if std::path::Path::new("/tmp/output.json").exists() {
-                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
-                output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
-            }
-            output_json["license"] = json!(component_licenses.clone());
-            std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("Successfully posted SCA scan data to server!");
-                }else{
-                    println!("Error while posting SCA scan data to server!");
-                }
+        }
+        let post_link = format!("{}/license_data", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
+        let post_data = post_json_data(&post_link, json!(manifest_license)).await;
+            // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+        // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+        let mut output_json = json!({});
+        if std::path::Path::new("/tmp/output.json").exists() {
+            let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+            output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
+        }
+        output_json["license"] = json!(manifest_license);
+        std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        if verbose {
+            if post_data.get("status").unwrap() == "200 OK" {
+                println!("Successfully posted SCA scan data to server!");
+            }else{
+                println!("Error while posting SCA scan data to server!");
             }
         }
     }

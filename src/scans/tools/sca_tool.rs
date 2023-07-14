@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde_json::{json, Value};
 
 use crate::utils::{common::{execute_command, post_json_data}, file_utils::find_files_recursively};
@@ -156,7 +158,7 @@ impl ScaTool {
         }
         self.install_project_dependencies(&_path, ignore_dirs.clone(), verbose).await;
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
-        //println!("Found manifests: {:?}", manifests);
+        let mut mainfest_sca_result = HashMap::new();
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
@@ -165,25 +167,26 @@ impl ScaTool {
             let json_output = serde_json::from_str::<serde_json::Value>(&sca_output).unwrap();
             let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
             let json_output = json_output[0].as_object().unwrap();
-            let json_output = Value::Object(json_output.clone());
-            let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
+            mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), json_output.clone());
+        }
+    
 
-            let post_data = post_json_data(&post_link, json_output.clone()).await;
-            // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
-            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
-            let mut output_json = json!({});
-            if std::path::Path::new("/tmp/output.json").exists() {
-                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
-                output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
-            }
-            output_json["sca"] = json_output.clone();
-            std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("Successfully posted SCA scan data to server!");
-                }else{
-                    println!("Error while posting SCA scan data to server!");
-                }
+        let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
+        let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
+        // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+        // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+        let mut output_json = json!({});
+        if std::path::Path::new("/tmp/output.json").exists() {
+            let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+            output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
+        }
+        output_json["sca"] = json!(mainfest_sca_result);
+        std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        if verbose {
+            if post_data.get("status").unwrap() == "200 OK" {
+                println!("Successfully posted SCA scan data to server!");
+            }else{
+                println!("Error while posting SCA scan data to server!");
             }
         }
     }
