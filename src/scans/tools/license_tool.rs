@@ -63,7 +63,11 @@ impl LicenseTool {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let random_file_name = format!("{}.json", uuid::Uuid::new().to_string());
-            let license_command = format!("cd {} && cdxgen -o {}", folder_path, random_file_name);
+            // if manifest ends with pom.xml then pass -t java otherwise nothing
+            let mut license_command = format!("cd {} && cdxgen -o {}", folder_path, random_file_name);
+            if file_name.ends_with("pom.xml") {
+                license_command = format!("cd {} && cdxgen -o {} -t java", folder_path, random_file_name);
+            }
             execute_command(&license_command, false).await;
             // Read JSON file and parse data
             let license_json = std::fs::read_to_string(format!("{}/{}", folder_path, random_file_name)).unwrap();
@@ -99,7 +103,7 @@ impl LicenseTool {
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
         if verbose {
             if post_data.get("status").unwrap() == "200 OK" {
-                println!("Successfully posted SCA scan data to server!");
+                println!("[+] Successfully posted SCA scan data to server!");
             }else{
                 println!("Error while posting SCA scan data to server!");
             }

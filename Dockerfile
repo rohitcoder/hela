@@ -32,6 +32,10 @@ RUN apt-get install -y --no-install-recommends tzdata \
     python3-venv && \
     pip3 install semgrep
 
+## Lets upgrade nodejs
+RUN npm install n -g
+RUN n stable
+
 ## Install go using wget and then set the path
 RUN wget https://go.dev/dl/go1.20.3.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go1.20.3.linux-amd64.tar.gz && \

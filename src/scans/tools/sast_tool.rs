@@ -62,15 +62,24 @@ impl SastTool {
         // clone repo https://github.com/rohitcodergroww/semgrep-rules to /tmp/sast-rules
         if !std::path::Path::new("/tmp/sast-rules").exists() {
             if verbose {
-                println!("[+] Cloning sast-rules repo...");
+                println!("[+] Downloading Rules");
             }
             let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
             execute_command(&clone_command, true).await;
+            if verbose {
+                println!("[+] Rules Downloaded");
+            }
         }
 
         // Lets RUN SAST SCAN using let cmd = format!("semgrep --config {}/sast-rules {} {} {} --verbose --metrics off --max-target-bytes 1000000 --json -o {}/sast_output.json", tmp_folder, folder_path, exclude_flags, exclude_rules, tmp_folder);
+        if verbose {
+            println!("[+] Running SAST scan...");
+        }
         let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json", _path);
         execute_command(&cmd, true).await;
+        if verbose {
+            println!("[+] SAST scan completed!");
+        }
         // parse output and show it in terminal
         let is_file_exists = std::path::Path::new("/tmp/sast_output.json").exists();
        

@@ -184,7 +184,7 @@ impl ScaTool {
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
         if verbose {
             if post_data.get("status").unwrap() == "200 OK" {
-                println!("Successfully posted SCA scan data to server!");
+                println!("[+] Successfully posted SCA scan data to server!");
             }else{
                 println!("Error while posting SCA scan data to server!");
             }
