@@ -7,23 +7,22 @@ To use the tool without building from source and installing Rust dependencies, y
 1. Pull the Docker image:
 
 ```shell
-docker pull <docker-image>
+docker pull rohitcoder/code-security
 ```
-Replace <docker-image> with the appropriate image name or tag.
 
 2. Run the tool using Docker:
 
 ```shell
-docker run <docker-options> code-security <tool-options>
+docker run rohitcoder/code-security <tool-options>
 ```
 
-Replace <docker-options> with any additional Docker options you may need (e.g., volume mounting), and <tool-options> with the desired tool options explained in the next section.
+Add any Docker options you may need (e.g., volume mounting), and <tool-options> with the desired tool options explained in the next section.
 
 ### Usage
 To run the Code Security Tool, use the following command:
 
 ```shell
-docker run code-security --path <path> --license-compliance --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
+docker run rohitcoder/code-security --path <path> --license-compliance --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
 ```
 Replace ``<path>`` with the path to your project, which can be either a local folder path or a Git repository URL. If you want to use it with a private repository, provide the Git repository path with an access token.
 
@@ -32,3 +31,107 @@ Replace ``<policy_url> ``with the URL of your policy file in YAML format. This f
 The tool will execute the specified scans (``--license-compliance``, ``--sast``, ``--sca``, ``--secret``) on your project and enforce the policies defined in the policy file. Verbose mode (``--verbose``) will provide detailed output.
 
 Note: The API endpoints and start-server functionality are currently in development and not available.
+
+## Building & Installation from Source
+
+Clone and build the project:
+
+```shell
+git clone https://github.com/rohitcoder/code-security.git
+cd code-security
+cargo build --release
+```
+
+## CLI Usage
+To use the tool from the command line, run the following command:
+
+```shell
+cargo run -- [options]
+```
+Replace ``[options]`` with the desired options from the list below.
+
+### Options
+<table>
+   <thead>
+      <tr>
+         <th>Option</th>
+         <th>Description</th>
+      </tr>
+   </thead>
+   <tbody>
+      <tr>
+         <td>-v, --verbose</td>
+         <td>Enable verbose mode.</td>
+      </tr>
+      <tr>
+         <td>
+            -p 
+            <path>
+            , --path 
+            <path>
+         </td>
+         <td>Pass the path of the project to scan (local path or HTTP Git URL).</td>
+      </tr>
+      <tr>
+         <td>
+            -i 
+            <commit_id>
+            , --commit-id 
+            <commit_id>
+         </td>
+         <td>Pass the commit ID to scan (optional).</td>
+      </tr>
+      <tr>
+         <td>
+            -b 
+            <branch>
+            , --branch 
+            <branch>
+         </td>
+         <td>Pass the branch name to scan (optional).</td>
+      </tr>
+      <tr>
+         <td>-s, --sast</td>
+         <td>Run SAST scan.</td>
+      </tr>
+      <tr>
+         <td>
+            -u 
+            <server_url>
+            , --server-url 
+            <server_url>
+         </td>
+         <td>Pass the server URL to post scan results.</td>
+      </tr>
+      <tr>
+         <td>-c, --sca</td>
+         <td>Run SCA scan.</td>
+      </tr>
+      <tr>
+         <td>-e, --secret</td>
+         <td>Run Secret scan.</td>
+      </tr>
+      <tr>
+         <td>-l, --license-compliance</td>
+         <td>Run License Compliance scan.</td>
+      </tr>
+      <tr>
+         <td>-j, --json</td>
+         <td>Print JSON output. Note: This won't work with pipeline check implementation.</td>
+      </tr>
+      <tr>
+         <td>
+            -y 
+            <policy_url>
+            , --policy-url 
+            <policy_url>
+         </td>
+         <td>Pass the policy URL to check if the pipeline should fail.</td>
+      </tr>
+      <tr>
+         <td>-a, --start-server</td>
+         <td>Start the API server.</td>
+      </tr>
+   </tbody>
+</table>
+
