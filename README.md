@@ -135,3 +135,23 @@ Replace ``[options]`` with the desired options from the list below.
    </tbody>
 </table>
 
+## Example working command
+```shell
+docker run rohitcoder/code-security --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcodergroww/cicd-policies/main/policy.yaml --verbose
+```
+
+## 💪 Contributors
+Thank you for continuously making this tool better! 🙏
+
+<a href="https://github.com/rohitcoder/code-security/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=rohitcoder/code-security" />
+</a>
+
+### Contribute
+
+Please go through the [contributing guidelines](https://github.com/rohitcoder/code-security/blob/main/CONTRIBUTING.md) before you start, and let us know if you have any challenges or questions.
+
+
+**Code Security** is maintained by [Rohit Kumar (@rohitcoder)](https://github.com/rohitcoder)
+
+Thank you!
