@@ -85,12 +85,15 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
       // lets prepare list of Vulnerabilities with package name, version, ecosytem in each vulnerability
       for (manifest_file, sca_result) in json_output["sca"].as_object().unwrap() {
         let mut vulnerabilities = Vec::new();
+        if sca_result["packages"].as_array().unwrap().len() == 0 {
+            continue;
+        }
         for package in sca_result["packages"].as_array().unwrap() {
             let mut vulnerability = HashMap::new();
             vulnerability.insert("package", package["package"]["name"].as_str().unwrap());
             vulnerability.insert("version", package["package"]["version"].as_str().unwrap());
             vulnerability.insert("ecosystem", package["package"]["ecosystem"].as_str().unwrap());
-
+            let mut vulns_list = Vec::new();
             for vuln in package["vulnerabilities"].as_array().unwrap() {
                 let mut severity = vuln["database_specific"]["severity"].as_str().unwrap();
                 if severity == "MODERATE" {
@@ -129,9 +132,11 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 } else if severity.to_lowercase() == "low" {
                     low_count += 1;
                 }
+                vulns_list.push(vulnerability.clone());
             }
-
-            vulnerabilities.push(vulnerability);
+            for vuln in vulns_list {
+                vulnerabilities.push(vuln);
+            }
         }
 
             println!("\n\n");

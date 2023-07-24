@@ -47,7 +47,7 @@ impl ScaTool {
              let language = language_mapping.get(file_name).unwrap().to_string();
              if language == "python" {
                 if verbose {
-                    println!("[INFO] Found python manifest file, installing python dependencies...");
+                    println!("[+] Found python manifest file, installing python dependencies...");
                 }
                 let install_command = format!("cd {} && pip install -r {}", folder_path, file_name);
                 execute_command(&install_command, true).await;
@@ -58,6 +58,9 @@ impl ScaTool {
                     }
                     let install_command = format!("cd {} && sh {}/python.sh", folder_path, installation_script_path);
                     execute_command(&install_command, true).await;
+                }
+                if verbose {
+                    println!("[+] Installation of python dependencies completed!");
                 }
              }
              if language == "javascript" {
@@ -70,10 +73,13 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                  if verbose {
-                    println!("Installing javascript dependencies...");
+                    println!("[+] Installing javascript dependencies...");
                  }
                  let install_command = format!("cd {} && npm install --force --ignore-scripts", folder_path);
                  execute_command(&install_command, true).await;
+                    if verbose {
+                        println!("[+] Installation of javascript dependencies completed!");
+                    }
              }
 
              if language == "maven" {
@@ -86,10 +92,13 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                 if verbose {
-                    println!("Installing maven dependencies...");
+                    println!("[+] Installing maven dependencies...");
                 }
                  let install_command = format!("cd {} && mvn install", folder_path);
                  execute_command(&install_command, true).await;
+                if verbose {
+                    println!("[+] Installation of maven dependencies completed!");
+                }
              }
 
              if language == "gradle" {
@@ -102,10 +111,13 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                 if verbose {
-                    println!("Installing gradle dependencies...");
+                    println!("[+] Installing gradle dependencies...");
                 }
                 let install_command = format!("cd {} && gradle build", folder_path);
                 execute_command(&install_command, true).await;
+                if verbose {
+                    println!("[+] Installation of gradle dependencies completed!");
+                }
              }
            }
         }
@@ -158,7 +170,7 @@ impl ScaTool {
         }
         self.install_project_dependencies(&_path, ignore_dirs.clone(), verbose).await;
         let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
-        let mut mainfest_sca_result = HashMap::new();
+        let mut mainfest_sca_result: HashMap<String, serde_json::Map<String, Value>> = HashMap::new();
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
@@ -166,13 +178,29 @@ impl ScaTool {
             let sca_output = execute_command(&sca_command, true).await;
             let json_output = serde_json::from_str::<serde_json::Value>(&sca_output).unwrap();
             let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
-            let json_output = json_output[0].as_object().unwrap();
-            mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), json_output.clone());
+            if json_output.len() > 0 {
+                let json_output = json_output[0].as_object().unwrap();
+                mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), json_output.clone());
+            } else {
+                println!("[*] No vulnerabilities found in {} manifest file!", file_name);
+                let manifest_path = format!("{}/{}", folder_path, file_name);
+                let blank_vals = serde_json::from_str::<serde_json::Map<String, Value>>(format!("{{\"source\": {{\"path\": \"{}\", \"type\": \"lockfile\"}}, \"packages\": []}}", manifest_path).as_str()).unwrap();
+                mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), blank_vals);
+            }
         }
     
-
-        let post_link = format!("{}/sca", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-        let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
+        if _server_url.is_some() {
+            println!("[+] Posting SCA scan data to server...");
+            let post_link = format!("{}/sca", _server_url.unwrap());
+            let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
+            if verbose {
+                if post_data.get("status").unwrap() == "200 OK" {
+                    println!("[+] Successfully posted SCA scan data to server!");
+                }else{
+                    println!("Error while posting SCA scan data to server!");
+                }
+            }
+        }
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
         let mut output_json = json!({});
@@ -182,12 +210,5 @@ impl ScaTool {
         }
         output_json["sca"] = json!(mainfest_sca_result);
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
-        if verbose {
-            if post_data.get("status").unwrap() == "200 OK" {
-                println!("[+] Successfully posted SCA scan data to server!");
-            }else{
-                println!("Error while posting SCA scan data to server!");
-            }
-        }
     }
 }

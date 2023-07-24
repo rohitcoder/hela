@@ -91,9 +91,18 @@ impl SastTool {
         let json_output = serde_json::from_str::<serde_json::Value>(&json_output.to_string()).unwrap();
         // pick results key from json_output
         let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
-        let post_link = format!("{}/sast", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-
-        let post_data = post_json_data(&post_link, serde_json::Value::Array(json_output.clone())).await;
+        if _server_url.is_some() {
+            println!("Posting SAST scan data to server...");
+            let post_link = format!("{}/sast", _server_url.unwrap());
+            let post_data = post_json_data(&post_link, serde_json::Value::Array(json_output.clone())).await;
+            if verbose {
+                if post_data.get("status").unwrap() == "200 OK" {
+                    println!("Successfully posted SAST scan data to server!");
+                }else{
+                    println!("Error while posting SAST scan data to server!");
+                }
+            }
+        }
          // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
         let mut output_json = json!({});
@@ -104,12 +113,5 @@ impl SastTool {
         output_json["sast"] = serde_json::Value::Array(json_output.clone());
 
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
-        if verbose {
-            if post_data.get("status").unwrap() == "200 OK" {
-                println!("Successfully posted SAST scan data to server!");
-            }else{
-                println!("Error while posting SAST scan data to server!");
-            }
-        }
     }
 }

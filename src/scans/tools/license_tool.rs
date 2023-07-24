@@ -90,23 +90,26 @@ impl LicenseTool {
                 manifest_license.insert(format!("{}/{}", folder_path, file_name), component_licenses.clone());
             }
         }
-        let post_link = format!("{}/license_data", _server_url.unwrap_or("https://eol9ssu6pz3y2ju.m.pipedream.net"));
-        let post_data = post_json_data(&post_link, json!(manifest_license)).await;
+        if _server_url.is_some() {
+            let post_link = format!("{}/license_data", _server_url.unwrap());
+            let post_data = post_json_data(&post_link, json!(manifest_license)).await;
+
+            if verbose {
+                if post_data.get("status").unwrap() == "200 OK" {
+                    println!("[+] Successfully posted SCA scan data to server!");
+                }else{
+                    println!("Error while posting SCA scan data to server!");
+                }
+            }
+        }
             // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
-        // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
-        let mut output_json = json!({});
-        if std::path::Path::new("/tmp/output.json").exists() {
-            let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+            let mut output_json = json!({});
+            if std::path::Path::new("/tmp/output.json").exists() {
+                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
             output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
         }
         output_json["license"] = json!(manifest_license);
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
-        if verbose {
-            if post_data.get("status").unwrap() == "200 OK" {
-                println!("[+] Successfully posted SCA scan data to server!");
-            }else{
-                println!("Error while posting SCA scan data to server!");
-            }
-        }
     }
 }
