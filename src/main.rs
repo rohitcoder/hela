@@ -3,7 +3,7 @@ mod utils;
 mod api;
 
 
-use std::process::exit;
+use std::{process::exit};
 
 use scans::scanner::ScanRunner;
 use utils::pipeline;
@@ -12,7 +12,7 @@ use actix_web::{App, HttpServer};
 use dotenv::dotenv;
 use argparse::{ArgumentParser, StoreTrue, Store};
 
-async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, verbose: bool) {
+async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, no_install:bool, root_only: bool, build_args: String,  manifests: String, rule_path: String, verbose: bool) {
     let scanner = ScanRunner::new(
         SastTool::new(),
         ScaTool::new(),
@@ -20,7 +20,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
         LicenseTool::new(),
     );
 
-    scanner.execute_scan(scan_type, path, commit_id, branch, server_url, verbose).await;
+    scanner.execute_scan(scan_type, path, commit_id, branch, server_url, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
 }
 
 async fn start_server() -> std::io::Result<()> {
@@ -37,6 +37,8 @@ async fn start_server() -> std::io::Result<()> {
 async fn main() {
     dotenv().ok();
     // Parse command-line arguments
+    let mut no_install = false;
+    let mut root_only = false;
     let mut is_sast = false;
     let mut is_sca = false;
     let mut is_secret = false;
@@ -44,10 +46,13 @@ async fn main() {
     let mut is_start_server = false;
     let mut verbose = false;
     let mut path = String::new();
+    let mut rule_path = String::new();
     let mut commit_id = String::new();
     let mut server_url = String::new();
     let mut branch = String::new();
     let mut policy_url = String::new();
+    let mut build_args = String::new();
+    let mut manifests = String::new();
     let mut json = false;
 
     {
@@ -56,7 +61,9 @@ async fn main() {
         ap.refer(&mut verbose)
             .add_option(&["-v", "--verbose"], StoreTrue, "Enable verbose mode!");
         ap.refer(&mut path)
-            .add_option(&["-p", "--path"], Store, "Pass the path of the project to scan (Local Path or HTTP Git URL)");
+            .add_option(&["-p", "--code-path"], Store, "Pass the path of the project to scan (Local Path or HTTP Git URL)");
+        ap.refer(&mut rule_path)
+            .add_option(&["-t", "--rule-path"], Store, "Pass the path of the rules to use (Local Path or HTTP Git URL)");
         ap.refer(&mut commit_id)
             .add_option(&["-i", "--commit-id"], Store, "Pass the commit ID to scan (Optional)");
         ap.refer(&mut branch)
@@ -77,6 +84,14 @@ async fn main() {
             .add_option(&["-y", "--policy-url"], Store, "Pass the policy url to check if pipeline should fail");
         ap.refer(&mut is_start_server)
             .add_option(&["-a", "--start-server"], StoreTrue, "Start API server");
+        ap.refer(&mut no_install)
+            .add_option(&["-n", "--no-install"], StoreTrue, "Skip installing dependencies");
+        ap.refer(&mut root_only)
+            .add_option(&["-r", "--root-only"], StoreTrue, "Scan manifests only in the root directory, don't look for manifests in subdirectories");
+        ap.refer(&mut build_args)
+            .add_option(&["-d", "--build-args"], Store, "Pass the build context args to scan");
+        ap.refer(&mut manifests)
+            .add_option(&["-m", "--manifests"], Store, "Pass the manifests pom.xml, requirements.txt etc to scan and we will look for only that kind of manifests");
         ap.parse_args_or_exit();
     }
 
@@ -94,19 +109,19 @@ async fn main() {
     }
 
     if is_sast {
-        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
+        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_sca {
-        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
+        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only,  build_args.clone(), manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_secret {
-        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
+        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) },no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_license_compliance {
-        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, verbose).await;
+        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {

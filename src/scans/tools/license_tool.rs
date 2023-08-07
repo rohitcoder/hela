@@ -1,11 +1,11 @@
-use std::{collections::HashMap, hash::Hash};
+
+use std::collections::HashMap;
 
 use mongodb::bson::uuid;
 use serde_json::json;
 
 use crate::{utils::{common::{execute_command, post_json_data}, file_utils::find_files_recursively}, scans::tools::sca_tool::SUPPORTED_MANIFESTS};
 
-use super::sca_tool::DETECT_MANIFESTS;
 
 pub struct LicenseTool;
 
@@ -57,7 +57,7 @@ impl LicenseTool {
             // now run secret scan on /tmp/new_code folder
             _path = format!("/tmp/new_code");
         }
-        let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
+        let manifests = find_files_recursively(&_path, unsafe { SUPPORTED_MANIFESTS.to_vec() }, ignore_dirs).await;
         let mut manifest_license = HashMap::new();
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();

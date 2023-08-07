@@ -6,16 +6,19 @@ use crate::utils::{common::{execute_command, post_json_data}, file_utils::find_f
 
 pub struct ScaTool;
 
-pub static SUPPORTED_MANIFESTS : [&str; 3] = [
+pub static mut SUPPORTED_MANIFESTS : [&str; 4] = [
     "requirements.txt",
     "package-lock.json",
-    "pom.xml"
+    "pom.xml",
+    "pnpm-lock.yaml"
 ];
 
-pub static DETECT_MANIFESTS : [&str; 3] = [
+
+pub static mut DETECT_MANIFESTS : [&str; 4] = [
     "requirements.txt",
     "package.json",
-    "pom.xml"
+    "pom.xml",
+    "pnpm-lock.yaml"
 ];
 
 impl ScaTool {
@@ -23,12 +26,21 @@ impl ScaTool {
         ScaTool
     }
 
-    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>, verbose: bool) {
+    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>, detect_manifests: Vec<&str>, no_install: bool, root_only: bool, build_args:String, verbose: bool) {
         // detect if project is python or nodejs based on manifest from DETECT_MANIFESTS and install that
         // installation script for each language would be in /tmp/install/ folder with file like python.sh, javascript.sh, java.sh etc for each language, developer need to write that script and we will execute it here based on language detection
         let installation_script_path = format!("{}/install", std::env::temp_dir().to_str().unwrap());
-        
-        let detected_files = find_files_recursively(_path, DETECT_MANIFESTS.to_vec(), ignore_dirs).await;
+        let mut detected_files = Vec::new();
+        if !root_only {
+            detected_files = find_files_recursively(_path, detect_manifests, ignore_dirs).await;
+        }else{
+            for manifest in detect_manifests.iter() {
+                let manifest_path = format!("{}/{}", _path, manifest);
+                if std::path::Path::new(&manifest_path).exists() {
+                    detected_files.push(manifest_path);
+                }
+            }
+        }
         let language_mapping = {
             let mut map = std::collections::HashMap::new();
             map.insert("requirements.txt", "python");
@@ -37,6 +49,7 @@ impl ScaTool {
             map.insert("pom.xml", "maven");
             map.insert("build.gradle", "gradle");
             map.insert("go.mod", "go");
+            map.insert("pnpm-lock.yaml", "pnpm-javascript");
             map
         };
         // check if we have one of manifest file from DETECT_MANIFESTS then install dependencies based on language_mapping
@@ -47,9 +60,9 @@ impl ScaTool {
              let language = language_mapping.get(file_name).unwrap().to_string();
              if language == "python" {
                 if verbose {
-                    println!("[+] Found python manifest file, installing python dependencies...");
+                    println!("[+] Found python manifest file, installing python dependencies for {}", file_name);
                 }
-                let install_command = format!("cd {} && pip install -r {}", folder_path, file_name);
+                let install_command = format!("cd {} && pip install -r {} {}", folder_path, file_name, build_args.clone());
                 execute_command(&install_command, true).await;
                 // check if installation script exists for python and then execute it
                 if std::path::Path::new(&format!("{}/python.sh", installation_script_path)).exists() {
@@ -63,7 +76,7 @@ impl ScaTool {
                     println!("[+] Installation of python dependencies completed!");
                 }
              }
-             if language == "javascript" {
+             if language == "javascript" || language == "pnpm-javascript" {
                 // check if installation script exists for python and then execute it
                  if std::path::Path::new(&format!("{}/javascript.sh", installation_script_path)).exists() {
                     if verbose {
@@ -73,13 +86,20 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                  if verbose {
-                    println!("[+] Installing javascript dependencies...");
+                    println!("[+] Installing javascript dependencies for {}...", file_name);
                  }
-                 let install_command = format!("cd {} && npm install --force --ignore-scripts", folder_path);
-                 execute_command(&install_command, true).await;
-                    if verbose {
-                        println!("[+] Installation of javascript dependencies completed!");
-                    }
+                 if language == "pnpm-javascript" {
+                    let install_command = format!("cd {} && pnpm install --force --ignore-scripts {}", folder_path, build_args.clone());
+                    println!("[INFO] Running command: {}", install_command);
+                    execute_command(&install_command, true).await;
+                 }else{
+                    let install_command = format!("cd {} && npm install --force --ignore-scripts {}", folder_path, build_args.clone());
+                    println!("[INFO] Running command: {}", install_command);
+                    execute_command(&install_command, true).await;
+                }
+                if verbose {
+                    println!("[+] Installation of javascript dependencies completed!");
+                }
              }
 
              if language == "maven" {
@@ -92,9 +112,9 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                 if verbose {
-                    println!("[+] Installing maven dependencies...");
+                    println!("[+] Installing maven dependencies for {}...", file_name);
                 }
-                 let install_command = format!("cd {} && mvn install", folder_path);
+                 let install_command = format!("cd {} && mvn install {}", folder_path, build_args.clone());
                  execute_command(&install_command, true).await;
                 if verbose {
                     println!("[+] Installation of maven dependencies completed!");
@@ -111,9 +131,9 @@ impl ScaTool {
                     execute_command(&install_command, true).await;
                  }
                 if verbose {
-                    println!("[+] Installing gradle dependencies...");
+                    println!("[+] Installing gradle dependencies for {}...", file_name);
                 }
-                let install_command = format!("cd {} && gradle build", folder_path);
+                let install_command = format!("cd {} && gradle build {}", folder_path, build_args.clone());
                 execute_command(&install_command, true).await;
                 if verbose {
                     println!("[+] Installation of gradle dependencies completed!");
@@ -123,10 +143,28 @@ impl ScaTool {
         }
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
         if verbose {
             println!("[+] Running SCA scan on path: {}", _path);
+            println!("[+] Commit ID: {}", _commit_id.unwrap_or("None"));
+            println!("[+] Branch: {}", _branch.unwrap_or("None"));
+            println!("[+] Build args: {}", build_args.clone());
+            println!("[+] Manifests: {}", manfiests.clone());
         }
+
+        let mut new_manifests = Vec::new();
+        let mut new_detect_manifests = Vec::new();
+
+        if manfiests != "" {
+            new_manifests = manfiests.split(",").collect::<Vec<&str>>();
+            new_detect_manifests = manfiests.split(",").collect::<Vec<&str>>();
+        }else{
+            unsafe {
+                new_manifests = SUPPORTED_MANIFESTS.to_vec();
+                new_detect_manifests = DETECT_MANIFESTS.to_vec();
+            }
+        }
+
         let mut ignore_dirs = Vec::new();
         ignore_dirs.push("node_modules");
         ignore_dirs.push("bin");
@@ -165,13 +203,35 @@ impl ScaTool {
             // now run secret scan on /tmp/new_code folder
             _path = format!("/tmp/new_code");
         }
-        if verbose {
+        if verbose && !no_install {
             println!("[+] Installing project dependencies...");
+            self.install_project_dependencies(&_path, ignore_dirs.clone(), new_detect_manifests, no_install.clone(), root_only, build_args.clone(), verbose).await;
+        }else{
+            println!("[+] Skipping installation of project dependencies...");
         }
-        self.install_project_dependencies(&_path, ignore_dirs.clone(), verbose).await;
-        let manifests = find_files_recursively(&_path, SUPPORTED_MANIFESTS.to_vec(), ignore_dirs).await;
+        let mut manifests = Vec::new();
+
+        if !root_only {
+            println!("[+] Searching for manifest files, you can ignore this by passing --root-only flag...");
+            manifests = find_files_recursively(&_path, new_manifests, ignore_dirs).await;
+            println!("Manifests found: {:?}", manifests);
+        }else{
+            println!("[+] Searching for manifest files in root directory...");
+            for manifest in new_manifests.iter() {
+                let manifest_path = format!("{}/{}", _path, manifest);
+                if std::path::Path::new(&manifest_path).exists() {
+                    manifests.push(manifest_path);
+                }
+            }
+        }
+
+        if manifests.len() == 0 {
+            println!("[*] No manifest files found!");
+            return;
+        }
         let mut mainfest_sca_result: HashMap<String, serde_json::Map<String, Value>> = HashMap::new();
         for manifest in manifests.iter() {
+            println!("[+] Running SCA scan on {} manifest file...", manifest);
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let sca_command = format!("cd {} && osv-scanner --format json -L {}", folder_path, file_name);

@@ -61,7 +61,7 @@ RUN \
   apt-get -y install --no-install-recommends sbt
 
 # Install npm
-RUN npm install -g @cyclonedx/cdxgen
+RUN npm install -g @cyclonedx/cdxgen pnpm
 RUN export FETCH_LICENSE=true
 
 # Install gradle

@@ -9,7 +9,7 @@ impl SastTool {
         SastTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, rule_path: String, verbose: bool) {
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path);
         }
@@ -58,14 +58,18 @@ impl SastTool {
             // now run secret scan on /tmp/new_code folder
             _path = format!("/tmp/new_code");
         }
-
-        // clone repo https://github.com/rohitcodergroww/semgrep-rules to /tmp/sast-rules
         if !std::path::Path::new("/tmp/sast-rules").exists() {
             if verbose {
                 println!("[+] Downloading Rules");
             }
-            let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
-            execute_command(&clone_command, true).await;
+            if rule_path != "" && rule_path.starts_with("http") {
+                println!("[+] Downloading Rules from {}", rule_path);
+                let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
+                execute_command(&clone_command, true).await;
+            }else {
+                let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
+                execute_command(&clone_command, true).await;
+            }
             if verbose {
                 println!("[+] Rules Downloaded");
             }

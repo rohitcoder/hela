@@ -67,10 +67,51 @@ Replace ``[options]`` with the desired options from the list below.
          <td>
             -p 
             <path>
-            , --path 
+            , --code-path 
             <path>
          </td>
          <td>Pass the path of the project to scan (local path or HTTP Git URL).</td>
+      </tr>
+      <tr>
+         <td>
+            -t 
+            <path>
+            , --rule-path
+            <path>
+         </td>
+         <td>Pass the path of the semgrep rules repository (local path or HTTP Git URL).</td>
+      </tr>
+      <tr>
+         <td>
+            -n 
+            <path>
+            , --no-install
+            <path>
+         </td>Use this option to skip installation of project during SCA scan (Useful when you already have lock files in repo, and you want to save time).</td>
+      </tr>
+      <tr>
+         <td>
+            -r 
+            <path>
+            , --root-only
+            <path>
+         </td>Pass this flag, if you want to run SCA for only root folder manifests.</td>
+      </tr>
+      <tr>
+         <td>
+            -d
+            <path>
+            , --build-args
+            <path>
+         </td>Provide any additional build arguments for SCA scan (This will be injected in build commands like mvn build or npm run)</td>
+      </tr>
+      <tr>
+         <td>
+            -
+            <path>
+            , --manifests
+            <path>
+         </td>Pass list of manifests type to scan (comma separated values). Example: --manifests packages-lock.json,requirements.txt</td>
       </tr>
       <tr>
          <td>
