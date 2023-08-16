@@ -1,9 +1,14 @@
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
 
+use super::common;
+
 pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String) {
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
+
+    let mut exit_code = 1;
+    let mut exit_msg = String::new();
 
     // now lets clean the result and store only required data
     let original_output = std::fs::read_to_string("/tmp/output.json").unwrap();
@@ -305,6 +310,8 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                     }
                 }
             }
+            exit_code = common::EXIT_CODE_SAST_FAILED;
+            exit_msg = common::SAST_FAILED_MSG.to_string();
         }
 
         if is_sca && sca_policy.is_some() {
@@ -333,6 +340,8 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                     }
                 }
             }
+            exit_code = common::EXIT_CODE_SCA_FAILED;
+            exit_msg = common::SCA_FAILED_MSG.to_string();
         }
 
         if is_secret && secret_policy.is_some() {
@@ -347,6 +356,8 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                     }
                 }
             }
+            exit_code = common::EXIT_CODE_SECRET_FAILED;
+            exit_msg = common::SECRET_FAILED_MSG.to_string();
         }
 
         if is_license_compliance && license_policy.is_some() {
@@ -362,6 +373,8 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                     }
                 }
             }
+            exit_code = common::EXIT_CODE_LICENSE_FAILED;
+            exit_msg = common::LICENSE_FAILED_MSG.to_string();
         }
 
         if is_pipeline_failed {
@@ -369,8 +382,10 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
             println!("\t\t ================== ❌ Pipeline Failed ==================");
             println!("\t\t Reason: {}", pipeline_failure_reason);
             println!("\n\n");
+            println!("\t\t {}", exit_msg);
+            println!("\n\n");
             // finish everything and smoothly exit
-            exit(1);
+            exit(exit_code);
         }else{
             println!("\n\n");
             println!("\t\t ================== ✅ Pipeline Passed ==================");

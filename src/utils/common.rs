@@ -5,6 +5,17 @@ use reqwest::Client;
 use reqwest::header::HeaderMap;
 use serde_json::Value;
 
+// define statci exit codes and message
+
+pub const EXIT_CODE_LICENSE_FAILED: i32 = 101;
+pub const LICENSE_FAILED_MSG: &str = "License scan failed";
+pub const EXIT_CODE_SCA_FAILED: i32 = 102;
+pub const SCA_FAILED_MSG: &str = "SCA failed";
+pub const EXIT_CODE_SAST_FAILED: i32 = 103;
+pub const SAST_FAILED_MSG: &str = "SAST failed";
+pub const EXIT_CODE_SECRET_FAILED: i32 = 104;
+pub const SECRET_FAILED_MSG: &str = "Secret scan failed";
+
 pub fn print_error(error: &str, error_code: i32) {
     if error.to_lowercase().starts_with("warning") {
         println!("[❕] {}", error);

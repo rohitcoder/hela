@@ -67,6 +67,7 @@ impl SastTool {
                 let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
                 execute_command(&clone_command, true).await;
             }else {
+                println!("[+] Downloading Rules from default repo");
                 let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
                 execute_command(&clone_command, true).await;
             }
