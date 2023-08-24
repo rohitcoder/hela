@@ -87,7 +87,8 @@ Replace ``[options]`` with the desired options from the list below.
             <path>
             , --no-install
             <path>
-         </td>Use this option to skip installation of project during SCA scan (Useful when you already have lock files in repo, and you want to save time).</td>
+         </td>
+         <td>Use this option to skip installation of project during SCA scan (Useful when you already have lock files in repo, and you want to save time).</td>
       </tr>
       <tr>
          <td>
@@ -95,7 +96,8 @@ Replace ``[options]`` with the desired options from the list below.
             <path>
             , --root-only
             <path>
-         </td>Pass this flag, if you want to run SCA for only root folder manifests.</td>
+         </td>
+         <td>Pass this flag, if you want to run SCA for only root folder manifests.</td>
       </tr>
       <tr>
          <td>
@@ -103,7 +105,8 @@ Replace ``[options]`` with the desired options from the list below.
             <path>
             , --build-args
             <path>
-         </td>Provide any additional build arguments for SCA scan (This will be injected in build commands like mvn build or npm run)</td>
+         </td>
+         <td>Provide any additional build arguments for SCA scan (This will be injected in build commands like mvn build or npm run)</td>
       </tr>
       <tr>
          <td>
@@ -111,7 +114,8 @@ Replace ``[options]`` with the desired options from the list below.
             <path>
             , --manifests
             <path>
-         </td>Pass list of manifests type to scan (comma separated values). Example: --manifests packages-lock.json,requirements.txt</td>
+         </td>
+         <td>Pass list of manifests type to scan (comma separated values). Example: --manifests packages-lock.json,requirements.txt</td>
       </tr>
       <tr>
          <td>
@@ -120,6 +124,7 @@ Replace ``[options]`` with the desired options from the list below.
             , --commit-id 
             <commit_id>
          </td>
+         <td>
          <td>Pass the commit ID to scan (optional).</td>
       </tr>
       <tr>
@@ -129,6 +134,7 @@ Replace ``[options]`` with the desired options from the list below.
             , --branch 
             <branch>
          </td>
+         <td>
          <td>Pass the branch name to scan (optional).</td>
       </tr>
       <tr>
@@ -171,7 +177,7 @@ Replace ``[options]`` with the desired options from the list below.
       </tr>
       <tr>
          <td>-a, --start-server</td>
-         <td>Start the API server.</td>
+         <td>Start the API server (In Development, won't work for now)</td>
       </tr>
    </tbody>
 </table>

@@ -10,7 +10,9 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
     let mut exit_code = 1;
     let mut exit_msg = String::new();
 
-    // now lets clean the result and store only required data
+    if !std::path::Path::new("/tmp/output.json").exists() {
+        return;
+    }
     let original_output = std::fs::read_to_string("/tmp/output.json").unwrap();
     let json_output: serde_json::Value = serde_json::from_str(&original_output).expect("Error parsing JSON");
     

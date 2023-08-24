@@ -1,6 +1,5 @@
 mod scans;
 mod utils;
-mod api;
 
 
 use std::{process::exit};
@@ -21,16 +20,6 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
     );
 
     scanner.execute_scan(scan_type, path, commit_id, branch, server_url, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
-}
-
-async fn start_server() -> std::io::Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .configure(api::scan::config)
-    })
-    .bind("127.0.0.1:8000")?
-    .run()
-    .await
 }
 
 #[actix_web::main]
@@ -99,15 +88,6 @@ async fn main() {
         println!("[+] Verbose mode enabled!");
     }
 
-    if is_start_server {
-        println!("Starting API server...");
-        if let Err(err) = start_server().await {
-            println!("Failed to start API server: {}", err);
-            exit(1)
-        }
-        println!("API server started successfully!");
-    }
-
     if is_sast {
         execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
@@ -125,7 +105,7 @@ async fn main() {
     }
 
     if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {
-        println!("Invalid command. Available commands: start-server, sast, sca, secret, license-compliance");
+        println!("Invalid command. Available commands: sast, sca, secret, license-compliance");
     }
 
     if json {
