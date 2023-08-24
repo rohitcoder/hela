@@ -32,7 +32,6 @@ async fn main() {
     let mut is_sca = false;
     let mut is_secret = false;
     let mut is_license_compliance = false;
-    let mut is_start_server = false;
     let mut verbose = false;
     let mut path = String::new();
     let mut rule_path = String::new();
@@ -71,8 +70,6 @@ async fn main() {
             .add_option(&["-j", "--json"], StoreTrue, "Print JSON output, Note: This won't work with pipeline check implementation");
         ap.refer(&mut policy_url)
             .add_option(&["-y", "--policy-url"], Store, "Pass the policy url to check if pipeline should fail");
-        ap.refer(&mut is_start_server)
-            .add_option(&["-a", "--start-server"], StoreTrue, "Start API server");
         ap.refer(&mut no_install)
             .add_option(&["-n", "--no-install"], StoreTrue, "Skip installing dependencies");
         ap.refer(&mut root_only)
@@ -104,7 +101,7 @@ async fn main() {
         execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
-    if !is_start_server && !is_sast && !is_sca && !is_secret && !is_license_compliance {
+    if !is_sast && !is_sca && !is_secret && !is_license_compliance {
         println!("Invalid command. Available commands: sast, sca, secret, license-compliance");
     }
 
