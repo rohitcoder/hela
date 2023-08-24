@@ -124,7 +124,6 @@ Replace ``[options]`` with the desired options from the list below.
             , --commit-id 
             <commit_id>
          </td>
-         <td>
          <td>Pass the commit ID to scan (optional).</td>
       </tr>
       <tr>
@@ -134,7 +133,6 @@ Replace ``[options]`` with the desired options from the list below.
             , --branch 
             <branch>
          </td>
-         <td>
          <td>Pass the branch name to scan (optional).</td>
       </tr>
       <tr>
@@ -175,16 +173,45 @@ Replace ``[options]`` with the desired options from the list below.
          </td>
          <td>Pass the policy URL to check if the pipeline should fail.</td>
       </tr>
-      <tr>
-         <td>-a, --start-server</td>
-         <td>Start the API server (In Development, won't work for now)</td>
-      </tr>
    </tbody>
 </table>
 
+### Write a Pipelien failure Policy Rule
+
+You can use these policy to fail your pipleine builds in your CI/CD flow. Scanner will check for the conditions defined in the policy file and will fail the pipeline if any of the condition is met.
+
+```yaml
+## list in which conditions our pipeline should fail
+sast:
+  critical_count:
+    operator: greater_than ## supports greater_than, less_than, equal_to
+    value: 2
+  high_count:
+    operator: greater_than
+    value: 2
+
+sca:
+  critical_count:
+    operator: greater_than
+    value: 2
+  high_count:
+    operator: greater_than
+    value: 1
+
+secret:
+  contains:
+  - JDBC # supports abbysale,abstract,abuseipdb,accuweather,adafruitio,adobeio,adzuna,aeroworkflow,agora,aha,airbrakeprojectkey,airbrakeuserkey,airship,airtableapikey,airvisual,aiven,alchemy,alconost,alegra,aletheiaapi,algoliaadminkey,alibaba,alienvault,allsports,amadeus,ambee,amplitudeapikey,anypoint,apacta,api2cart,apideck,apiflash,apifonica,apify,apilayer,apimatic,apiscience,apitemplate,apollo,appcues,appfollow,appointedd,appsynergy,apptivo,artifactory,artsy,asanaoauth,asanapersonalaccesstoken,assemblyai,atera,audd,auth0managementapitoken,auth0oauth,autodesk,autoklose,autopilot,avazapersonalaccesstoken,aviationstack,aws,axonaut,aylien,ayrshare,azure,bannerbear,baremetrics,baseapiio,beamer,beebole,besnappy,besttime,billomat,bitbar,bitcoinaverage,bitfinex,bitlyaccesstoken,bitmex,blablabus,blazemeter,blitapp,blocknative,blogger,bombbomb,boostnote,borgbase,braintreepayments,brandfetch,browserstack,browshot,bscscan,buddyns,bugherd,bugsnag,buildkite,buildkitev2,bulbul,bulksms,buttercms,caflou,calendarific,c...e,telnyx,terraformcloudpersonaltoken,testingbot,text2data,textmagic,theoddsapi,thinkific,thousandeyes,ticketmaster,tickettailor,tiingo,timecamp,timezoneapi,tineswebhook,tly,tmetric,todoist,toggltrack,tokeet,tomorrowio,tomtom,tradier,transferwise,travelpayouts,travisci,trelloapikey,tru,trufflehogenterprise,twelvedata,twilio,twist,twitch,twitter,tyntec,typeform,typetalk,ubidots,uclassify,unifyid,unplugg,unsplash,upcdatabase,uplead,uploadcare,uptimerobot,upwave,uri,urlscan,user,userflow,userstack,vatlayer,vbout,vercel,verifier,verimail,veriphone,versioneye,viewneo,virustotal,visualcrossing,voicegain,voodoosms,vouchery,vpnapi,vultrapikey,vyte,walkscore,weatherbit,weatherstack,webex,webflow,webscraper,webscraping,websitepulse,wepay,whoxy,wistia,wit,worksnaps,workstack,worldcoinindex,worldweather,wrike,yandex,yelp,youneedabudget,yousign,youtubeapikey,zapierwebhook,zendeskapi,zenkitapi,zenrows,zenscrape,zenserp,zeplin,zerobounce,zipapi,zipbooks,zipcodeapi,zipcodebase,zonkafeedback,zulipchat
+
+license:
+  contains:
+  - AGPL
+  - GPL
+  - LGPL
+```
+
 ## Example working command
 ```shell
-docker run rohitcoder/code-security --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcodergroww/cicd-policies/main/policy.yaml --verbose
+docker run rohitcoder/code-security --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcoder/code-security-policies/main/policy-fail.yaml --verbose
 ```
 
 ## 💪 Contributors
