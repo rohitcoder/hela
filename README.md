@@ -1,4 +1,4 @@
-## Code Security Tool
+## Hela 
 This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected.
 
 ### Docker Installation
