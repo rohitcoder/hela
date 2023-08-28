@@ -28,4 +28,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/code-security:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/hella:latest
