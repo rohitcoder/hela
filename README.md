@@ -2,18 +2,18 @@
 This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected.
 
 ### Docker Installation
-To use the tool without building from source and installing Rust dependencies, you can run it using Docker. Follow the instructions below:
+To use the tool without building from the source and installing Rust dependencies, you can run it using Docker. Follow the instructions below:
 
 1. Pull the Docker image:
 
 ```shell
-docker pull rohitcoder/code-security
+docker pull rohitcoder/hela
 ```
 
 2. Run the tool using Docker:
 
 ```shell
-docker run rohitcoder/code-security <tool-options>
+docker run rohitcoder/hela <tool-options>
 ```
 
 Add any Docker options you may need (e.g., volume mounting), and <tool-options> with the desired tool options explained in the next section.
@@ -22,7 +22,7 @@ Add any Docker options you may need (e.g., volume mounting), and <tool-options> 
 To run the Code Security Tool, use the following command:
 
 ```shell
-docker run rohitcoder/code-security --path <path> --license-compliance --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
+docker run rohitcoder/hela --path <path> --license-compliance --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
 ```
 Replace ``<path>`` with the path to your project, which can be either a local folder path or a Git repository URL. If you want to use it with a private repository, provide the Git repository path with an access token.
 
@@ -37,8 +37,8 @@ Note: The API endpoints and start-server functionality are currently in developm
 Clone and build the project:
 
 ```shell
-git clone https://github.com/rohitcoder/code-security.git
-cd code-security
+git clone https://github.com/rohitcoder/hela.git
+cd hela
 cargo build --release
 ```
 
@@ -211,19 +211,19 @@ license:
 
 ## Example working command
 ```shell
-docker run rohitcoder/code-security --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcoder/code-security-policies/main/policy-fail.yaml --verbose
+docker run rohitcoder/hela --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcoder/code-security-policies/main/policy-fail.yaml --verbose
 ```
 
 ## 💪 Contributors
 Thank you for continuously making this tool better! 🙏
 
-<a href="https://github.com/rohitcoder/code-security/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=rohitcoder/code-security" />
+<a href="https://github.com/rohitcoder/hela/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=rohitcoder/hela" />
 </a>
 
 ### Contribute
 
-Please go through the [contributing guidelines](https://github.com/rohitcoder/code-security/blob/main/CONTRIBUTING.md) before you start, and let us know if you have any challenges or questions.
+Please go through the [contributing guidelines](https://github.com/rohitcoder/hela/blob/main/CONTRIBUTING.md) before you start, and let us know if you have any challenges or questions.
 
 
 **Code Security** is maintained by [Rohit Kumar (@rohitcoder)](https://github.com/rohitcoder)
