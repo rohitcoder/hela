@@ -2,13 +2,10 @@ mod scans;
 mod utils;
 
 
-use std::{process::exit};
 
 use scans::scanner::ScanRunner;
 use utils::pipeline;
 use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
-use actix_web::{App, HttpServer};
-use dotenv::dotenv;
 use argparse::{ArgumentParser, StoreTrue, Store};
 
 async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, no_install:bool, root_only: bool, build_args: String,  manifests: String, rule_path: String, verbose: bool) {
@@ -24,7 +21,6 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
 
 #[actix_web::main]
 async fn main() {
-    dotenv().ok();
     // Parse command-line arguments
     let mut no_install = false;
     let mut root_only = false;

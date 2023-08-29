@@ -469,25 +469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "code-security"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "argparse",
- "dotenv",
- "futures",
- "mongodb",
- "prettytable-rs",
- "proc-macro2",
- "rand",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "structopt",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -942,6 +923,25 @@ name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+
+[[package]]
+name = "hela"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "argparse",
+ "dotenv",
+ "futures",
+ "mongodb",
+ "prettytable-rs",
+ "proc-macro2",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "structopt",
+]
 
 [[package]]
 name = "hermit-abi"
