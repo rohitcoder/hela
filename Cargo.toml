@@ -4,6 +4,10 @@ version = "0.1.1"
 edition = "2021"
 description = "This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected."
 license = "MIT"
+keywords = ["sca", "sast", "secret", "license-scan", "security", "code security", "cybersecurity"]
+repository = "https://github.com/rohitcoder/hela"
+authors = ["Rohit Kumar (@rohitcoder)"]
+
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
