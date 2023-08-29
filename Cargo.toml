@@ -1,7 +1,10 @@
 [package]
-name = "code-security"
+name = "Hela"
 version = "0.1.0"
 edition = "2021"
+description = "This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected."
+license = "MIT"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
