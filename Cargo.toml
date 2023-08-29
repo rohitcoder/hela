@@ -1,6 +1,6 @@
 [package]
 name = "Hela"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected."
 license = "MIT"
