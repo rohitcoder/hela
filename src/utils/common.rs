@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::{process::Command, os::unix::process::ExitStatusExt};
 use futures::StreamExt;
-use reqwest::Client;
-use reqwest::header::HeaderMap;
+
+
 use serde_json::Value;
 
 // define statci exit codes and message

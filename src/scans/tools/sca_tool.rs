@@ -26,7 +26,7 @@ impl ScaTool {
         ScaTool
     }
 
-    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>, detect_manifests: Vec<&str>, no_install: bool, root_only: bool, build_args:String, verbose: bool) {
+    async fn install_project_dependencies(&self, _path: &str, ignore_dirs: Vec<&str>, detect_manifests: Vec<&str>, _no_install: bool, root_only: bool, build_args:String, verbose: bool) {
         // detect if project is python or nodejs based on manifest from DETECT_MANIFESTS and install that
         // installation script for each language would be in /tmp/install/ folder with file like python.sh, javascript.sh, java.sh etc for each language, developer need to write that script and we will execute it here based on language detection
         let installation_script_path = format!("{}/install", std::env::temp_dir().to_str().unwrap());
