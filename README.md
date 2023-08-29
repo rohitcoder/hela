@@ -19,7 +19,7 @@ docker run rohitcoder/hela <tool-options>
 Add any Docker options you may need (e.g., volume mounting), and <tool-options> with the desired tool options explained in the next section.
 
 ### Usage
-To run the Code Security Tool, use the following command:
+To run the Hela Tool, use the following command:
 
 ```shell
 docker run rohitcoder/hela --path <path> --license-compliance --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
@@ -226,6 +226,6 @@ Thank you for continuously making this tool better! 🙏
 Please go through the [contributing guidelines](https://github.com/rohitcoder/hela/blob/main/CONTRIBUTING.md) before you start, and let us know if you have any challenges or questions.
 
 
-**Code Security** is maintained by [Rohit Kumar (@rohitcoder)](https://github.com/rohitcoder)
+**Hela** is maintained by [Rohit Kumar (@rohitcoder)](https://github.com/rohitcoder)
 
 Thank you!
