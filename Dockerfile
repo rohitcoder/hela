@@ -1,15 +1,15 @@
 FROM rust:latest
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
 
-COPY Cargo.toml /code-security/Cargo.toml
-COPY Cargo.lock /code-security/Cargo.lock
-COPY src /code-security/src
+COPY Cargo.toml /hela/Cargo.toml
+COPY Cargo.lock /hela/Cargo.lock
+COPY src /hela/src
 
-WORKDIR /code-security
+WORKDIR /hela
 
 RUN cargo build --release \
-    && mv /code-security/target/release/code-security /usr/local/bin/binary \
-    && rm -rf /code-security
+    && mv /hela/target/release/hela /usr/local/bin/binary \
+    && rm -rf /hela
 
 # Update the package list and upgrade the system
 RUN apt-get update && \
@@ -71,7 +71,7 @@ RUN wget https://services.gradle.org/distributions/gradle-7.0-bin.zip && \
     export GRADLE_HOME=/opt/gradle && \
     export PATH=$PATH:$GRADLE_HOME/bin
 
-RUN rm /code-security/gradle-7.0-bin.zip
+RUN rm /hela/gradle-7.0-bin.zip
 
 
 ENTRYPOINT ["binary"]
