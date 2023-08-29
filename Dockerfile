@@ -8,7 +8,7 @@ COPY src /hela/src
 WORKDIR /hela
 
 RUN cargo build --release \
-    && mv /hela/target/release/hela /usr/local/bin/binary \
+    && mv /hela/target/release/Hela /usr/local/bin/hela \
     && rm -rf /hela
 
 # Update the package list and upgrade the system
