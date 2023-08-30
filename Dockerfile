@@ -20,16 +20,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London
 
 
-RUN apt-get install -y --no-install-recommends tzdata
-RUN apt-get install -y software-properties-common
-RUN apt-get install -y python3-pip
-RUN apt-get install -y default-jdk
-RUN apt-get install -y npm
-RUN apt-get install -y maven
-RUN apt-get install -y composer
-RUN apt-get install -y curl
-RUN apt-get install -y wget
-RUN apt-get install -y python3-venv
+RUN apt-get install -y --no-install-recommends tzdata software-properties-common python3-pip default-jdk npm maven composer curl wget python3-venv
 RUN pip3 install semgrep --break-system-packages
 
 ## Lets upgrade nodejs
