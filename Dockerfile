@@ -65,4 +65,4 @@ RUN wget https://services.gradle.org/distributions/gradle-7.0-bin.zip && \
 RUN rm /hela/gradle-7.0-bin.zip
 
 
-ENTRYPOINT ["binary"]
+ENTRYPOINT ["hela"]
