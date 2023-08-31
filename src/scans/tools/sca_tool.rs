@@ -204,17 +204,25 @@ impl ScaTool {
             _path = format!("/tmp/new_code");
         }
         if verbose && !no_install {
-            println!("[+] Installing project dependencies...");
+            if verbose {
+                println!("[+] Installing project dependencies...");
+            }
             self.install_project_dependencies(&_path, ignore_dirs.clone(), new_detect_manifests, no_install.clone(), root_only, build_args.clone(), verbose).await;
         }else{
-            println!("[+] Skipping installation of project dependencies...");
+            if verbose {
+                println!("[+] Skipping installation of project dependencies...");
+            }
         }
         let mut manifests = Vec::new();
 
         if !root_only {
-            println!("[+] Searching for manifest files, you can ignore this by passing --root-only flag...");
+            if verbose {
+                println!("[+] Searching for manifest files, you can ignore this by passing --root-only flag...");
+            }
             manifests = find_files_recursively(&_path, new_manifests, ignore_dirs).await;
-            println!("Manifests found: {:?}", manifests);
+            if verbose {
+                println!("Manifests found: {:?}", manifests);
+            }
         }else{
             println!("[+] Searching for manifest files in root directory...");
             for manifest in new_manifests.iter() {
@@ -231,18 +239,30 @@ impl ScaTool {
         }
         let mut mainfest_sca_result: HashMap<String, serde_json::Map<String, Value>> = HashMap::new();
         for manifest in manifests.iter() {
-            println!("[+] Running SCA scan on {} manifest file...", manifest);
+            if verbose {
+                println!("[+] Running SCA scan on {} manifest file...", manifest);
+            }
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let sca_command = format!("cd {} && osv-scanner --format json -L {}", folder_path, file_name);
             let sca_output = execute_command(&sca_command, true).await;
-            let json_output = serde_json::from_str::<serde_json::Value>(&sca_output).unwrap();
+            let json_output = match serde_json::from_str::<serde_json::Value>(&sca_output) {
+                Ok(json_output) => json_output,
+                Err(_) => {
+                    if verbose {
+                        println!("[*] Error while running SCA scan on {} manifest file!", file_name);
+                    }
+                    continue;
+                }
+            };
             let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
             if json_output.len() > 0 {
                 let json_output = json_output[0].as_object().unwrap();
                 mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), json_output.clone());
             } else {
-                println!("[*] No vulnerabilities found in {} manifest file!", file_name);
+                if verbose {
+                    println!("[*] No vulnerabilities found in {} manifest file!", file_name);
+                }
                 let manifest_path = format!("{}/{}", folder_path, file_name);
                 let blank_vals = serde_json::from_str::<serde_json::Map<String, Value>>(format!("{{\"source\": {{\"path\": \"{}\", \"type\": \"lockfile\"}}, \"packages\": []}}", manifest_path).as_str()).unwrap();
                 mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), blank_vals);
@@ -250,7 +270,9 @@ impl ScaTool {
         }
     
         if _server_url.is_some() {
-            println!("[+] Posting SCA scan data to server...");
+            if verbose {
+                println!("[+] Posting SCA scan data to server...");
+            }
             let post_link = format!("{}/sca", _server_url.unwrap());
             let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
             if verbose {
