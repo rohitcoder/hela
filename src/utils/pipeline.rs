@@ -92,13 +92,12 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
 
       // lets prepare list of Vulnerabilities with package name, version, ecosytem in each vulnerability
         if json_output["sca"].as_object().is_some() {
-       
             for (manifest_file, sca_result) in json_output["sca"].as_object().unwrap() {
-        let mut vulnerabilities = Vec::new();
-        if sca_result["packages"].as_array().unwrap().len() == 0 {
-            continue;
-        }
-        for package in sca_result["packages"].as_array().unwrap() {
+                let mut vulnerabilities = Vec::new();
+                if sca_result["packages"].as_array().unwrap().len() == 0 {
+                    continue;
+                }
+            for package in sca_result["packages"].as_array().unwrap() {
             let mut vulnerability = HashMap::new();
             vulnerability.insert("package", package["package"]["name"].as_str().unwrap());
             vulnerability.insert("version", package["package"]["version"].as_str().unwrap());
@@ -162,7 +161,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 table.add_row(row![sca_count, format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"].chars().take(50).collect::<String>(), result["cwe_id"], result["aliases"]]);
             }
             table.printstd();
-        }
+            }
         }
 
         pipline_sca_data.insert("high_count", high_count);
