@@ -57,7 +57,7 @@ impl SecretTool {
         }
 
         let cmd = "trufflehog --version";
-        let out = execute_command(cmd, true).await;
+        let out = execute_command(cmd, false).await;
         if out == "" {
             print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
         }
