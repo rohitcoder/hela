@@ -24,7 +24,7 @@ Add any Docker options you may need (e.g., volume mounting), and <tool-options> 
 To run the Hela Tool, use the following command:
 
 ```shell
-docker run rohitcoder/hela --path <path> --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
+docker run rohitcoder/hela --code-path <path> --sast --sca --secret --license-compliance --policy-url <policy_url> --verbose
 ```
 Replace ``<path>`` with the path to your project, which can be either a local folder path or a Git repository URL. If you want to use it with a private repository, provide the Git repository path with an access token.
 
@@ -213,7 +213,7 @@ license:
 
 ## Example working command
 ```shell
-docker run rohitcoder/hela --path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcoder/code-security-policies/main/policy-fail.yaml --verbose
+docker run rohitcoder/hela --code-path https://github.com/appsecco/dvja --license-compliance --sast --sca --secret --license-compliance --policy-url https://raw.githubusercontent.com/rohitcoder/code-security-policies/main/policy-fail.yaml --verbose
 ```
 
 ## 💪 Contributors

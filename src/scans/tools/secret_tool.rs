@@ -56,11 +56,12 @@ impl SecretTool {
             _path = format!("/tmp/new_code");
         }
 
-        let cmd = "trufflehog --version";
+       /* let cmd = "trufflehog --version";
         let out = execute_command(cmd, false).await;
         if out == "" {
             print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
-        }
+        } */
+        
         // trufflehog filesystem --no-update /tmp/app --json >
         let cmd = format!("trufflehog filesystem --no-update {} --json", _path);
         let output_data = execute_command(&cmd, true).await;
