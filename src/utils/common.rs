@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command};
 use futures::StreamExt;
 
 
@@ -64,7 +64,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     // check if the command executed successfully
     if !stderr.is_empty() {
         if !suppress_error {
-            println!("For command: {}", command);
             print_error(format!("{}: {}", "Error executing process: ", stderr).as_str(), 101);
         }
     }
