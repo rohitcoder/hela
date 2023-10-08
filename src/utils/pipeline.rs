@@ -1,6 +1,5 @@
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
-use serde_json::json;
 
 use super::common;
 
@@ -15,7 +14,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
         return;
     }
     let original_output = std::fs::read_to_string("/tmp/output.json").unwrap();
-    let mut json_output: serde_json::Value = serde_json::from_str(&original_output).expect("Error parsing JSON");
+    let json_output: serde_json::Value = serde_json::from_str(&original_output).expect("Error parsing JSON");
     
     // start preparing results here
     let mut sast_results = Vec::new();

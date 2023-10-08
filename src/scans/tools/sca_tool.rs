@@ -152,8 +152,8 @@ impl ScaTool {
             println!("[+] Manifests: {}", manfiests.clone());
         }
 
-        let mut new_manifests = Vec::new();
-        let mut new_detect_manifests = Vec::new();
+        let new_manifests;
+        let new_detect_manifests ;
 
         if manfiests != "" {
             new_manifests = manfiests.split(",").collect::<Vec<&str>>();

@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::{process::Command, os::unix::process::ExitStatusExt};
 use futures::StreamExt;
 
 
 use serde_json::Value;
 
-// define statci exit codes and message
+// define static exit codes and message
 
 pub const EXIT_CODE_LICENSE_FAILED: i32 = 101;
 pub const LICENSE_FAILED_MSG: &str = "License scan failed";
@@ -62,7 +61,8 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let status = &output.status;
     
-    if !stderr.is_empty() && status != &std::process::ExitStatus::from_raw(0) {
+    // check if the command executed successfully
+    if !stderr.is_empty() {
         if !suppress_error {
             println!("For command: {}", command);
             print_error(format!("{}: {}", "Error executing process: ", stderr).as_str(), 101);
