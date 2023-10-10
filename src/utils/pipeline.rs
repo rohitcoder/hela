@@ -109,7 +109,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 }
                 vulnerability.insert("summary", vuln["summary"].as_str().unwrap());
                 vulnerability.insert("details", vuln["details"].as_str().unwrap());
-                vulnerability.insert("severity", severity.clone());
+                vulnerability.insert("severity", severity);
 
                 let cwe_id_array = vuln["database_specific"]["cwe_ids"].as_array().unwrap();
                 if cwe_id_array.len() > 0 {

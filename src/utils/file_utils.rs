@@ -1,14 +1,5 @@
 use super::common::execute_command;
 
-pub struct FileUtils;
-
-impl FileUtils {
-    pub fn read_file(path: &str) -> String {
-        // TODO: Implement file reading logic
-        format!("Reading file at path: {}", path)
-    }
-}
-
 pub async fn find_files_recursively(_path: &str, patterns: Vec<&str>, ignore_paths: Vec<&str>) -> Vec<String> {
     let mut manifests = Vec::new();
     let ignore_dirs: Vec<String> = ignore_paths

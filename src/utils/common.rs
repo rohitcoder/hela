@@ -1,7 +1,4 @@
 use std::{collections::HashMap, process::Command};
-use futures::StreamExt;
-
-
 use serde_json::Value;
 
 // define static exit codes and message
@@ -59,7 +56,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let status = &output.status;
     
     // check if the command executed successfully
     if !stderr.is_empty() {
@@ -73,39 +69,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     }
     
     stdout.to_string()
-}
-
-
-pub async fn http_get_request(url: &str) -> HashMap<String, String> {
-    //println!("{} {}", "Requesting: ".green(), url);
-    let client = reqwest::Client::new();
-    let mut _headers = reqwest::header::HeaderMap::new();
-    _headers.insert("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36".parse().unwrap());
-    let response = match client.get(url).headers(_headers).send().await {
-        Ok(response) => response,
-        Err(e) => {
-            print_error(format!("Error for request url {}: {}", url, e.to_string()).as_str(), 101);
-            return HashMap::new();
-        }
-    };
-    let mut reply = HashMap::new();
-    reply.insert("status".to_string(), response.status().to_string());
-    reply.insert("url".to_string(), url.to_string());
-    reply.insert("body".to_string(), response.text().await.unwrap());
-    reply
-}
-
-pub async fn send_parallel_requests(urls: Vec<&str>, limit: usize) -> Vec<HashMap<String, String>> {
-    let mut futures = vec![];
-    for url in urls {
-        let resp = http_get_request(url);
-        futures.push(resp);
-    }
-    let responses = futures::stream::iter(futures)
-        .buffer_unordered(limit)
-        .collect::<Vec<_>>()
-        .await;
-    responses
 }
 
 pub async fn post_json_data(url: &str, json_data: Value) -> HashMap<String, String> {
