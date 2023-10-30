@@ -1,9 +1,11 @@
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
 
+use crate::utils::common::slack_alert;
+
 use super::common;
 
-pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String) {
+pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
 
@@ -18,6 +20,8 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
     
     // start preparing results here
     let mut sast_results = Vec::new();
+    let mut slack_alert_msg = String::new();
+    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", code_path).as_str());
     if is_sast {
 
       let mut pipeline_sast_data: HashMap<&str, i64> = HashMap::new();
@@ -62,21 +66,26 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
       pipeline_sast_data.insert("warning_count", warning_count);
       pipeline_sast_data.insert("error_count", error_count);
 
-
       let mut table = Table::new();
-      println!("\n\n");
-      println!("\t\t ================== SAST Results ==================");
+
+      if sast_results.len() > 0 {
+        println!("\n\n");
+        println!("\t\t ================== SAST Results ==================");
+        slack_alert_msg.push_str("\n\n");
+        slack_alert_msg.push_str("\t\t ================== SAST Results ==================");
+      }
+
       table.add_row(row![bFg->"S.No", bFg->"Path", bFg->"Severity", bFg->"Message"]);
       let mut sast_count = 0;
       for result in sast_results {
           sast_count += 1;
           // strip message to 50 characters
           table.add_row(row![sast_count, result["path"], result["severity"], result["message"].chars().take(50).collect::<String>()]);
+          slack_alert_msg.push_str(&format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]));
       }
-      table.printstd();
-
-      pipeline_sast_sca_data.insert("sast", pipeline_sast_data);
+      pipeline_sast_sca_data.insert("sast", pipeline_sast_data.clone());
     }
+
 
     if is_sca {
       
@@ -146,10 +155,11 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 vulnerabilities.push(vuln);
             }
         }
-
-            println!("\n\n");
-            println!("\t\t ================== SCA Results for {} ==================", manifest_file);
-
+            if vulnerabilities.len() > 0 {
+                println!("\n\n");
+                println!("\t\t ================== SCA Results for {} ==================", manifest_file);
+                slack_alert_msg.push_str(&format!("\n\n\t\t ================== SCA Results for {} ==================", manifest_file));
+            }
             let mut table = Table::new();
             table.add_row(row![bFg->"S.No", bFg->"Package", bFg->"Severity", bFg->"Summary", bFg->"CWE ID", bFg->"Aliases"]);
             let mut sca_count = 0;
@@ -158,6 +168,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 sca_count += 1;
                 // strip summary to 50 characters
                 table.add_row(row![sca_count, format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"].chars().take(50).collect::<String>(), result["cwe_id"], result["aliases"]]);
+                slack_alert_msg.push_str(&format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]));
             }
             table.printstd();
             }
@@ -200,10 +211,13 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
 
       pipeline_secret_license_data.insert("detected_detectors", detected_detectors);
 
+      if secret_results.len() > 0 {
+        println!("\n\n");
+        println!("\t\t ================== Secret Results ==================");
+        slack_alert_msg.push_str("\n\n");
+        slack_alert_msg.push_str("================== Secret Results ==================");
+      }
 
-      println!("\n\n");
-      println!("\t\t ================== Secret Results ==================");
-  
       let mut table = Table::new();
       table.add_row(row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name"]);
       let mut secret_count = 0;
@@ -211,6 +225,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
       for (_key, value) in secret_results {
           secret_count += 1;
           table.add_row(row![secret_count, value["file"], value["line"], value["raw"], value["detector_name"]]);
+          slack_alert_msg.push_str(&format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]));
       }
       table.printstd();
     }
@@ -237,10 +252,11 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 }
             }
           }
-          
-          println!("\n\n");
-          println!("\t\t ================== License Details for {} ==================", manifest);
-
+          if license_results.len() > 0 {
+            println!("\n\n");
+            println!("\t\t ================== License Details for {} ==================", manifest);
+            slack_alert_msg.push_str(&format!("\n\n================== License Details for {} ==================", manifest));
+          }
           let mut table = Table::new();
           table.add_row(row![bFg->"S.No", bFg->"Package", bFg->"Licenses"]);
           let mut license_count = 0;
@@ -252,6 +268,7 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
                 license_array.push(license.as_str().unwrap());
             }
             table.add_row(row![license_count, package_name, license_array.join(", ")]);
+            slack_alert_msg.push_str(&format!("\n\nPackage: {}\nLicenses: {}", package_name, license_array.join(", ")));
           }
           table.printstd();
       }
@@ -388,12 +405,22 @@ pub async fn pipeline_failure(is_sast: bool, is_sca: bool, is_secret: bool, is_l
             println!("\n\n");
             println!("\t\t {}", exit_msg);
             println!("\n\n");
+            slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
+            slack_alert(&slack_url, &slack_alert_msg).await;
             // finish everything and smoothly exit
             exit(exit_code);
         }else{
             println!("\n\n");
             println!("\t\t ================== ✅ Pipeline Passed ==================");
+            slack_alert_msg.push_str("\n\n\t\t ================== ✅ Pipeline Passed ==================");
+            slack_alert(&slack_url, &slack_alert_msg).await;
             println!("\n\n");
         }
+    }else{
+        println!("\n\n");
+        println!("\t\t ================== ✅ Pipeline Passed ==================");
+        slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
+        slack_alert(&slack_url, &slack_alert_msg).await;
+        println!("\n\n");
     }
 }

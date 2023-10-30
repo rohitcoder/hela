@@ -12,6 +12,12 @@ pub const SAST_FAILED_MSG: &str = "SAST failed";
 pub const EXIT_CODE_SECRET_FAILED: i32 = 104;
 pub const SECRET_FAILED_MSG: &str = "Secret scan failed";
 
+pub async fn slack_alert(url: &str, message: &str) {
+    let mut payload = HashMap::new();
+    payload.insert("text".to_string(), message.to_string());
+    let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+}
+
 pub fn print_error(error: &str, error_code: i32) {
     if error.to_lowercase().starts_with("warning") {
         println!("[❕] {}", error);

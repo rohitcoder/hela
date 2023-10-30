@@ -38,6 +38,7 @@ async fn main() {
     let mut build_args = String::new();
     let mut manifests = String::new();
     let mut json = false;
+    let mut slack_url = String::new();
 
     {
         let mut ap = ArgumentParser::new();
@@ -74,6 +75,8 @@ async fn main() {
             .add_option(&["-d", "--build-args"], Store, "Pass the build context args to scan");
         ap.refer(&mut manifests)
             .add_option(&["-m", "--manifests"], Store, "Pass the manifests pom.xml, requirements.txt etc to scan and we will look for only that kind of manifests");
+        ap.refer(&mut slack_url)
+            .add_option(&["-k", "--slack-url"], Store, "Pass the slack url to receive scan alerts");
         ap.parse_args_or_exit();
     }
 
@@ -107,6 +110,6 @@ async fn main() {
             println!("{}", output);
         }
     }else {
-        pipeline::pipeline_failure(is_sast, is_sca, is_secret, is_license_compliance, policy_url).await;
+        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url).await;
     }
 }
