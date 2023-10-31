@@ -1,5 +1,5 @@
 ## Hela 
-**Note: This is a copy of Hela repository, you can find original source code here - [https://github.com/rohitcoder/hela](https://github.com/rohitcoder/hela/blob/main/CONTRIBUTING.md)** 
+**Note: This is a copy of Hela repository, you can find original source code here - [https://github.com/rohitcoder/hela](https://github.com/rohitcoder/hela/blob/main/CONTRIBUTING.md)**
 
 This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected.
 
