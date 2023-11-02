@@ -15,6 +15,7 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/auth@v1
         with:
+          project_id: stage-crdserv-applayer-01-7415
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
           export_default_credentials: true
       - name: Run gcloud test
