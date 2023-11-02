@@ -17,10 +17,14 @@ jobs:
           registry: gcr.io
           username: _json_key
           password: ${{ secrets.GCR_AUTH_CRDSERV }}
-      - name: Create Docker Context
-        run: docker context create my-context
-      - name: Use Docker Context
-        run: docker buildx use my-context
+      - name: Install Docker Buildx
+        run: |
+          # Install Docker Buildx
+          wget https://github.com/docker/buildx/releases/download/v0.6.3/buildx-v0.6.3.linux-amd64 -O /usr/local/bin/docker-buildx
+          chmod +x /usr/local/bin/docker-buildx
+          # Create a Docker context and use it
+          docker context create my-context
+          docker buildx use my-context
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
