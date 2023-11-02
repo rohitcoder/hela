@@ -8,42 +8,20 @@ on:
 jobs:
   build:
     runs-on: org-level-runner
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Set up Google Cloud CLI
-        uses: google-github-actions/auth@v1
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+      -
+        name: Set up Google Cloud CLI
+        uses:  google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
-
-      - name: Install Google Cloud SDK
-        run: |
-          curl -sSL https://sdk.cloud.google.com | bash
-          exec -l $SHELL
-        env:
-          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-
-      - name: Run Google Cloud Auth and Capture Credentials File Path
-        run: |
-          source $HOME/google-cloud-sdk/path.bash.inc
-          auth_output=$(gcloud auth activate-service-account --key-file=<(echo $CREDENTIALS_JSON) | tee /dev/tty)
-          key_file_path=$(echo "$auth_output" | grep -oP 'Created credentials file at "(\K[^"]+)')
-
-          echo "Key file path: $key_file_path"
-
-          # Set the key file path as an environment variable for subsequent steps
-          echo "::set-env name=KEY_FILE_PATH::$key_file_path"
-        env:
-          CREDENTIALS_JSON: ${{ secrets.GCR_AUTH_CRDSERV }}
-
-      - name: Configure Docker CLI
-        run: |
-          export GOOGLE_APPLICATION_CREDENTIALS="$KEY_FILE_PATH"
-          gcloud auth configure-docker -q
-
-      - name: Build and push to Google Container Registry
+      -
+        name: Configure Docker CLI
+        run: gcloud auth configure-docker -q
+      -
+        name: Build and push to Google Container Registry
         run: |
           docker build -t asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1 .
           docker push asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1
