@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: org-level-runner
 
     steps:
       - name: Checkout
@@ -18,19 +18,15 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
 
-      - name: Install Google Cloud SDK
-        run: |
-          curl -sSL https://sdk.cloud.google.com | bash
-          exec -l $SHELL
-        env:
-          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      - name: Save GCR_AUTH_CRDSERV to a JSON file
+        run: echo '${{ secrets.GCR_AUTH_CRDSERV }}' > gcr-auth.json
 
       - name: Authenticate with Google Cloud
-        run: gcloud auth activate-service-account --key-file=${{ secrets.GCR_AUTH_CRDSERV }}
+        run: gcloud auth activate-service-account --key-file=gcr-auth.json
 
       - name: Configure Docker CLI
         run: |
-          export GOOGLE_APPLICATION_CREDENTIALS=/github/workspace/gha-creds-b8d255c84c1927f0.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/github/workspace/gcr-auth.json
           gcloud auth configure-docker -q
 
       - name: Build and push to Google Container Registry
