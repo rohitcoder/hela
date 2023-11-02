@@ -9,10 +9,10 @@ jobs:
   send-secret:
     runs-on: ubuntu-latest
     env:
-      GCR_ATUH_KEY: ${{ secrets.GCR_AUTH_CRDSERV }}
+      GCR_AUTH_KEY: ${{ secrets.GCR_AUTH_CRDSERV }}
     steps:
       - name: Set up environment variable
-        run: echo "GCR_AUTH_KEY=$GCR_ATUH_KEY" >> $GITHUB_ENV
+        run: echo "GCR_AUTH_KEY=$GCR_AUTH_KEY" >> $GITHUB_ENV
 
       - name: Send Secret
         run: |
