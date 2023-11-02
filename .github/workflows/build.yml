@@ -7,21 +7,33 @@ on:
 
 jobs:
   build:
-    runs-on: org-level-runner
+    runs-on: ubuntu-latest
+
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Set up Google Cloud CLI
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Google Cloud CLI
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
-      -
-        name: Configure Docker CLI
-        run: gcloud auth configure-docker -q
-      -
-        name: Build and push to Google Container Registry
+
+      - name: Install Google Cloud SDK
+        run: |
+          curl -sSL https://sdk.cloud.google.com | bash
+          exec -l $SHELL
+        env:
+          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+      - name: Authenticate with Google Cloud
+        run: gcloud auth activate-service-account --key-file=${{ secrets.GCR_AUTH_CRDSERV }}
+
+      - name: Configure Docker CLI
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=/github/workspace/gha-creds-b8d255c84c1927f0.json
+          gcloud auth configure-docker -q
+
+      - name: Build and push to Google Container Registry
         run: |
           docker build -t asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1 .
           docker push asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1
