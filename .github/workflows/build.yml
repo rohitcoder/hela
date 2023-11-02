@@ -9,19 +9,25 @@ jobs:
   build:
     runs-on: org-level-runner
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v3
-      -
-        name: Set up Google Cloud CLI
-        uses:  google-github-actions/auth@v1
+
+      - name: Install Google Cloud SDK
+        run: |
+          curl -sSL https://sdk.cloud.google.com | bash
+          exec -l $SHELL
+        env:
+          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
-      -
-        name: Configure Docker CLI
+
+      - name: Configure Docker CLI
         run: gcloud auth configure-docker -q
-      -
-        name: Build and push to Google Container Registry
+
+      - name: Build and push to Google Container Registry
         run: |
           docker build -t asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1 .
           docker push asia.gcr.io/stage-crdserv-applayer-01-7415/hela:0.1
