@@ -18,9 +18,9 @@ jobs:
           curl -sSL https://sdk.cloud.google.com | bash
           exec -l $SHELL
           echo "source $HOME/google-cloud-sdk/path.bash.inc" >> $HOME/.bashrc
-        env:
-          CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-
+          export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+          source $HOME/.bashrc  # Source the updated .bashrc
+          
       - name: Set up Google Cloud CLI
         uses: google-github-actions/auth@v1
         with:
