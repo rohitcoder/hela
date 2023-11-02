@@ -19,9 +19,11 @@ jobs:
           password: ${{ secrets.GCR_AUTH_CRDSERV }}
       - name: Install Docker Buildx
         run: |
-          # Install Docker Buildx
-          wget https://github.com/docker/buildx/releases/download/v0.6.3/buildx-v0.6.3.linux-amd64 -O /usr/local/bin/docker-buildx
-          chmod +x /usr/local/bin/docker-buildx
+          # Create the directory if it doesn't exist
+          mkdir -p ~/.docker/cli-plugins
+          # Download and install Docker Buildx to ~/.docker/cli-plugins
+          wget https://github.com/docker/buildx/releases/download/v0.6.3/buildx-v0.6.3.linux-amd64 -O ~/.docker/cli-plugins/docker-buildx
+          chmod +x ~/.docker/cli-plugins/docker-buildx
           # Create a Docker context and use it
           docker context create my-context
           docker buildx use my-context
