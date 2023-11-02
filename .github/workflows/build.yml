@@ -27,6 +27,7 @@ jobs:
 
       - name: Run Google Cloud Auth and Capture Credentials File Path
         run: |
+          source $HOME/google-cloud-sdk/path.bash.inc
           auth_output=$(gcloud auth activate-service-account --key-file=<(echo $CREDENTIALS_JSON) | tee /dev/tty)
           key_file_path=$(echo "$auth_output" | grep -oP 'Created credentials file at "(\K[^"]+)')
 
