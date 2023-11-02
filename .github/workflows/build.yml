@@ -13,9 +13,9 @@ jobs:
         name: Checkout
         uses: actions/checkout@v3
       - name: Set up Cloud SDK
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/setup-gcloud@v0.3.0
         with:
           project_id: stage-crdserv-applayer-01-7415
           credentials_json: ${{ secrets.GCR_AUTH_CRDSERV }}
       - name: Run gcloud test
-        run: gcloud auth list
+        run: gcloud auth configure-docker
