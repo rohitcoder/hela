@@ -184,31 +184,36 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
         pipeline_sast_sca_data.insert("sca", pipline_sca_data);
     }
-
+    
+    let mut total_secrets_exposed = 0;
     if is_secret {
-
       let mut detected_detectors = Vec::new();
-
-      let mut secret_results = HashMap::new();
+    
+      let mut secret_results = Vec::new();
+      let mut total_secrets = 0;
       for result in json_output["secret"]["results"].as_array().unwrap() {
-          let mut secret_result = HashMap::new();
-          secret_result.insert("file", result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap());
-          if result["SourceMetadata"]["Data"]["Filesystem"]["line"].is_string() {
-            secret_result.insert("line", result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_str().unwrap());
-           }else{
-                secret_result.insert("line", "");
-           }
-          secret_result.insert("raw", result["Raw"].as_str().unwrap());
-          secret_result.insert("detector_name", result["DetectorName"].as_str().unwrap());
-          secret_result.insert("decoder_name", result["DecoderName"].as_str().unwrap());
-          secret_results.insert("results", secret_result);
-
-          if !detected_detectors.contains(&result["DetectorName"].as_str().unwrap().to_string()) {
-            detected_detectors.push(result["DetectorName"].as_str().unwrap().to_string());
+        total_secrets_exposed += 1;
+          let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {
+              Some(line_number) => line_number,
+              None => 0,
+          };
+          let number_string = line_number.to_string();
+          let secret_result = {
+              let mut secret_result = HashMap::new();
+              secret_result.insert("file", result["SourceMetadata"]["Data"]["Filesystem"]["file"].to_string());
+              secret_result.insert("line", number_string);
+              secret_result.insert("raw", result["Raw"].to_string());
+              secret_result.insert("detector_name", result["DetectorName"].to_string().to_uppercase());
+              secret_result.insert("decoder_name", result["DecoderName"].to_string());
+              secret_result
+          };
+          secret_results.push(secret_result);
+          if !detected_detectors.contains(&result["DetectorName"].as_str().unwrap().to_string().to_uppercase()) {
+              detected_detectors.push(result["DetectorName"].as_str().unwrap().to_string().to_uppercase());
           }
-          
       }
-
+      
+      detected_detectors = detected_detectors.iter().map(|x| x.to_string()).collect::<Vec<String>>();
       pipeline_secret_license_data.insert("detected_detectors", detected_detectors);
 
       if secret_results.len() > 0 {
@@ -221,12 +226,12 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut table = Table::new();
       table.add_row(row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name"]);
       let mut secret_count = 0;
-  
-      for (_key, value) in secret_results {
-          secret_count += 1;
-          table.add_row(row![secret_count, value["file"], value["line"], value["raw"], value["detector_name"]]);
-          slack_alert_msg.push_str(&format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]));
-      }
+        for value in secret_results {
+            secret_count += 1;
+            // strip raw to 50 characters also remove double quotes by replacing with empty string
+            table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
+            slack_alert_msg.push_str(&format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]));
+        }
       table.printstd();
     }
 
@@ -364,7 +369,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             exit_code = common::EXIT_CODE_SCA_FAILED;
             exit_msg = common::SCA_FAILED_MSG.to_string();
         }
-
+        
         if is_secret && secret_policy.is_some() {
             let secret_policy = secret_policy.unwrap().as_mapping().unwrap();
             if secret_policy.contains_key(&serde_yaml::Value::String("contains".to_string())) {
@@ -377,10 +382,30 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                     }
                 }
             }
+
+            for (_key, operator) in secret_policy {
+                let value  = secret_policy.get("value").unwrap().as_i64().unwrap();
+                if operator == "greater_than" {
+                    if total_secrets_exposed > value {
+                        is_pipeline_failed = true;
+                        pipeline_failure_reason = format!("Pipeline failed because {} secrets exposed  which is greater than {}",  total_secrets_exposed, value);
+                    }
+                }else if operator == "less_than" {
+                    if total_secrets_exposed < value {
+                        is_pipeline_failed = true;
+                        pipeline_failure_reason = format!("Pipeline failed because {} secrets exposed  which is less than {}",  total_secrets_exposed, value);
+                    }
+                }else if operator == "equal_to" {
+                    if total_secrets_exposed == value {
+                        is_pipeline_failed = true;
+                        pipeline_failure_reason = format!("Pipeline failed because {} secrets exposed  which is equal to {}",  total_secrets_exposed, value);
+                    }
+                }
+            }
+
             exit_code = common::EXIT_CODE_SECRET_FAILED;
             exit_msg = common::SECRET_FAILED_MSG.to_string();
         }
-
         if is_license_compliance && license_policy.is_some() {
             let license_policy = license_policy.unwrap().as_mapping().unwrap();
             if license_policy.contains_key(&serde_yaml::Value::String("contains".to_string())) {
