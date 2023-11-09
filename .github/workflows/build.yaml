@@ -31,20 +31,20 @@ jobs:
       - name: Logout from GCR for stage-crdserv-applayer-01-7415/hela:0.1
         run: docker logout asia.gcr.io
 
-      - name: Login to GCR for smgmt-infra-applayer-01-0864/hela:0.1
+      - name: Login to GCR for mgmt-infra-applayer-01-0864/hela:0.1
         uses: docker/login-action@v2
         with:
           registry: asia.gcr.io
           username: _json_key
           password: ${{ secrets.GCR_AUTH_BGV }}
 
-      - name: Build and push to smgmt-infra-applayer-01-0864/hela:0.1
+      - name: Build and push to mgmt-infra-applayer-01-0864/hela:0.1
         uses: docker/build-push-action@v2
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: asia.gcr.io/smgmt-infra-applayer-01-0864/hela:0.1
+          tags: asia.gcr.io/mgmt-infra-applayer-01-0864/hela:0.1
 
-      - name: Logout from GCR for smgmt-infra-applayer-01-0864/hela:0.1
+      - name: Logout from GCR for mgmt-infra-applayer-01-0864/hela:0.1
         run: docker logout asia.gcr.io
