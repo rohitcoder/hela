@@ -61,8 +61,10 @@ impl SecretTool {
         if out == "" {
             print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
         }
+        
+        let remove_git_folder = format!("rm -rf {}/.git", _path);
+        execute_command(&remove_git_folder, true).await;
 
-        // trufflehog filesystem --no-update /tmp/app --json >
         let cmd = format!("trufflehog filesystem --no-update {} --json", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();

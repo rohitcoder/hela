@@ -78,6 +78,9 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
 }
 
 pub async fn post_json_data(url: &str, json_data: Value) -> HashMap<String, String> {
+    if !url.starts_with("http") {
+        return HashMap::new();
+    }
     let client = reqwest::Client::new();
     let mut _headers = reqwest::header::HeaderMap::new();
     _headers.insert("Content-Type", "application/json".parse().unwrap());
