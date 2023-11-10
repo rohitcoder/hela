@@ -3,7 +3,7 @@ use prettytable::{Table, row};
 
 use crate::utils::common::slack_alert;
 
-use super::common::{self, print_error};
+use super::common::{self, print_error, redact_github_token};
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
     let mut pipeline_sast_sca_data = HashMap::new();
@@ -21,7 +21,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // start preparing results here
     let mut sast_results = Vec::new();
     let mut slack_alert_msg = String::new();
-    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", code_path).as_str());
+    // if code_path contains ghp_* thend redact that value because its token
+    let redacted_code_path = redact_github_token(&code_path);
+
+    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path).as_str());
+    println!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path);
     if is_sast {
 
       let mut pipeline_sast_data: HashMap<&str, i64> = HashMap::new();

@@ -29,6 +29,13 @@ pub fn print_error(error: &str, error_code: i32) {
     }
 }
 
+pub fn redact_github_token(input: &str) -> String {
+    let exploded = input.split("@").collect::<Vec<&str>>();
+    let secret = exploded[0].split("/").last().unwrap();
+    let redacted_string = input.replace(secret, "********");
+    redacted_string
+}
+
 pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     let suppress_error = suppress_error || false;
     let exec_name = command.split_whitespace().next().unwrap();
