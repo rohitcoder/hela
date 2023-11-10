@@ -13,7 +13,7 @@ impl SecretTool {
         /*
             1. Clone Repo
             2. Get Commit ID to scan and checkout to that commit ID using git checkout <Commit-ID>
-            3. Now copy only modified files from that commitID to another folder for scanning using git diff-tree --no-commit-id --name-only -r <Commit-ID> | xargs -I {} cp {} ~/Desktop/new_code/
+            3. Now copy only modified files from that commitID to another folder for scanning using git diff-tree --no-commit-id --name-only -r <Commit-ID> | xargs -I {} cp {} ~/Desktop/code/
         */
         // check if path is a local path ore git link and then clone it
         // if /tmp/app not exists then run below commands
@@ -46,14 +46,14 @@ impl SecretTool {
             }
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
             execute_command(&checkout_command, true).await;
-            // now copy only modified files from that commitID to new folder /tmp/new_code after creating new_code folder
-            // make a new folder /tmp/new_code
-            let copy_command = format!("mkdir -p /tmp/new_code");
+            // now copy only modified files from that commitID to new folder /tmp/code after creating code folder
+            // make a new folder /tmp/code
+            let copy_command = format!("mkdir -p /tmp/code");
             execute_command(&copy_command, true).await;
-            let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/new_code", _path, commit_id, commit_id, commit_id);
+            let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/code", _path, commit_id, commit_id, commit_id);
             execute_command(&copy_command, true).await;
-            // now run secret scan on /tmp/new_code folder
-            _path = format!("/tmp/new_code");
+            // now run secret scan on /tmp/code folder
+            _path = format!("/tmp/code");
         }
 
         let cmd = "trufflehog";
@@ -61,7 +61,7 @@ impl SecretTool {
         if out == "" {
             print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
         }
-        
+
         let remove_git_folder = format!("rm -rf {}/.git", _path);
         execute_command(&remove_git_folder, true).await;
 

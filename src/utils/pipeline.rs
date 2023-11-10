@@ -3,7 +3,7 @@ use prettytable::{Table, row};
 
 use crate::utils::common::slack_alert;
 
-use super::common;
+use super::common::{self, print_error, redact_github_token};
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
     let mut pipeline_sast_sca_data = HashMap::new();
@@ -21,7 +21,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // start preparing results here
     let mut sast_results = Vec::new();
     let mut slack_alert_msg = String::new();
-    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", code_path).as_str());
+    // if code_path contains ghp_* thend redact that value because its token
+    let redacted_code_path = redact_github_token(&code_path);
+
+    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path).as_str());
+    println!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path);
     if is_sast {
 
       let mut pipeline_sast_data: HashMap<&str, i64> = HashMap::new();
@@ -285,8 +289,47 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if !policy_url.is_empty() {
         let mut is_pipeline_failed = false;
         let mut pipeline_failure_reason = String::new();
-        let policy_yaml = reqwest::get(policy_url).await.unwrap().text().await.unwrap();
-        let policy_yaml: serde_yaml::Value = serde_yaml::from_str(&policy_yaml).unwrap();
+        // if policy_url starts with http or https then we will fetch policy file from url else we will read it from local file system
+        let mut policy_yaml: serde_yaml::Value = serde_yaml::Value::Null;
+        if policy_url.starts_with("http") {
+            let policy_yaml_string = match reqwest::get(policy_url).await {
+                Ok(response) => {
+                    match response.text().await {
+                        Ok(text) => text,
+                        Err(e) => {
+                            print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                            return;
+                        }
+                    }
+                },
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+            policy_yaml = match serde_yaml::from_str(&policy_yaml_string) {
+                Ok(value) => value,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+        }else{
+            let policy_yaml_string = match std::fs::read_to_string(policy_url) {
+                Ok(text) => text,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+            policy_yaml = match serde_yaml::from_str(&policy_yaml_string) {
+                Ok(value) => value,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+        }
         let policy_json = policy_yaml.as_mapping().unwrap();
         let mut sast_policy = None;
         let mut sca_policy = None;
@@ -384,6 +427,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             }
 
             for (_key, operator) in secret_policy {
+                if secret_policy.get("value").is_none() {
+                    continue;
+                }
                 let value  = secret_policy.get("value").unwrap().as_i64().unwrap();
                 if operator == "greater_than" {
                     if total_secrets_exposed > value {
