@@ -3,7 +3,7 @@ use prettytable::{Table, row};
 
 use crate::utils::common::slack_alert;
 
-use super::common;
+use super::common::{self, print_error};
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
     let mut pipeline_sast_sca_data = HashMap::new();
@@ -285,8 +285,28 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if !policy_url.is_empty() {
         let mut is_pipeline_failed = false;
         let mut pipeline_failure_reason = String::new();
-        let policy_yaml = reqwest::get(policy_url).await.unwrap().text().await.unwrap();
-        let policy_yaml: serde_yaml::Value = serde_yaml::from_str(&policy_yaml).unwrap();
+        let policy_yaml = match reqwest::get(policy_url).await {
+            Ok(response) => {
+                match response.text().await {
+                    Ok(text) => text,
+                    Err(e) => {
+                        print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                        return;
+                    }
+                }
+            },
+            Err(e) => {
+                print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                return;
+            }
+        };
+        let policy_yaml: serde_yaml::Value = match serde_yaml::from_str(&policy_yaml) {
+            Ok(value) => value,
+            Err(e) => {
+                print_error(format!("Error: Invalid policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                return;
+            }
+        };
         let policy_json = policy_yaml.as_mapping().unwrap();
         let mut sast_policy = None;
         let mut sca_policy = None;
