@@ -423,6 +423,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             }
 
             for (_key, operator) in secret_policy {
+                if secret_policy.get("value").is_none() {
+                    continue;
+                }
                 let value  = secret_policy.get("value").unwrap().as_i64().unwrap();
                 if operator == "greater_than" {
                     if total_secrets_exposed > value {
