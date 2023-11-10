@@ -285,28 +285,47 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if !policy_url.is_empty() {
         let mut is_pipeline_failed = false;
         let mut pipeline_failure_reason = String::new();
-        let policy_yaml = match reqwest::get(policy_url).await {
-            Ok(response) => {
-                match response.text().await {
-                    Ok(text) => text,
-                    Err(e) => {
-                        print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
-                        return;
+        // if policy_url starts with http or https then we will fetch policy file from url else we will read it from local file system
+        let mut policy_yaml: serde_yaml::Value = serde_yaml::Value::Null;
+        if policy_url.starts_with("http") {
+            let policy_yaml_string = match reqwest::get(policy_url).await {
+                Ok(response) => {
+                    match response.text().await {
+                        Ok(text) => text,
+                        Err(e) => {
+                            print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                            return;
+                        }
                     }
+                },
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
                 }
-            },
-            Err(e) => {
-                print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
-                return;
-            }
-        };
-        let policy_yaml: serde_yaml::Value = match serde_yaml::from_str(&policy_yaml) {
-            Ok(value) => value,
-            Err(e) => {
-                print_error(format!("Error: Invalid policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
-                return;
-            }
-        };
+            };
+            policy_yaml = match serde_yaml::from_str(&policy_yaml_string) {
+                Ok(value) => value,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+        }else{
+            let policy_yaml_string = match std::fs::read_to_string(policy_url) {
+                Ok(text) => text,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+            policy_yaml = match serde_yaml::from_str(&policy_yaml_string) {
+                Ok(value) => value,
+                Err(e) => {
+                    print_error(format!("Error: Invalid or unable to reach policy file, please contact support team! : {:?}", e.to_string()).as_str(), 101);
+                    return;
+                }
+            };
+        }
         let policy_json = policy_yaml.as_mapping().unwrap();
         let mut sast_policy = None;
         let mut sca_policy = None;
