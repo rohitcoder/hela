@@ -51,12 +51,12 @@ impl SastTool {
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
             execute_command(&checkout_command, true).await;
 
-            let copy_command = format!("mkdir -p /tmp/new_code");
+            let copy_command = format!("mkdir -p /tmp/code");
             execute_command(&copy_command, true).await;
-            let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/new_code", _path, commit_id, commit_id, commit_id);
+            let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/code", _path, commit_id, commit_id, commit_id);
             execute_command(&copy_command, true).await;
-            // now run secret scan on /tmp/new_code folder
-            _path = format!("/tmp/new_code");
+            // now run secret scan on /tmp/code folder
+            _path = format!("/tmp/code");
         }
         if !std::path::Path::new("/tmp/sast-rules").exists() {
             if verbose {
