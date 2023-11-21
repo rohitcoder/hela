@@ -9,6 +9,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
 
+    let mut found_sast_issues = false;
+    let mut found_sca_issues = false;
+    let mut found_secret_issues = false;
+    let mut found_license_issues = false;
+
     let mut exit_code = 1;
     let mut exit_msg = String::new();
 
@@ -73,6 +78,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut table = Table::new();
 
       if sast_results.len() > 0 {
+        found_sast_issues = true;
         println!("\n\n");
         println!("\t\t ================== SAST Results ==================");
         slack_alert_msg.push_str("\n\n");
@@ -160,6 +166,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             }
         }
             if vulnerabilities.len() > 0 {
+                found_sca_issues = true;
                 println!("\n\n");
                 println!("\t\t ================== SCA Results for {} ==================", manifest_file);
                 slack_alert_msg.push_str(&format!("\n\n\t\t ================== SCA Results for {} ==================", manifest_file));
@@ -220,23 +227,27 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       detected_detectors = detected_detectors.iter().map(|x| x.to_string()).collect::<Vec<String>>();
       pipeline_secret_license_data.insert("detected_detectors", detected_detectors);
 
-      if secret_results.len() > 0 {
+
+      let mut table = Table::new();
+      if secret_results.clone().len() > 0 {
+        found_secret_issues = true;
         println!("\n\n");
         println!("\t\t ================== Secret Results ==================");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str("================== Secret Results ==================");
+        table.add_row(row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name"]);
       }
 
-      let mut table = Table::new();
-      table.add_row(row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name"]);
       let mut secret_count = 0;
-        for value in secret_results {
+        for value in secret_results.clone() {
             secret_count += 1;
             // strip raw to 50 characters also remove double quotes by replacing with empty string
             table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
             slack_alert_msg.push_str(&format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]));
         }
-      table.printstd();
+        if secret_results.len() > 0 {
+            table.printstd();
+        }
     }
 
     if is_license_compliance {
@@ -283,6 +294,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       }
       licenses_list = licenses_list.iter().map(|x| x.to_lowercase()).collect::<Vec<String>>();
       pipeline_secret_license_data.insert("licenses", licenses_list);
+    }
+
+    if found_sast_issues == false && found_sca_issues == false && found_secret_issues == false && found_license_issues == false {
+        println!("\n\n\t\t\t No issues found in scan results");
     }
 
     // Policy implementation
@@ -468,7 +483,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             exit_code = common::EXIT_CODE_LICENSE_FAILED;
             exit_msg = common::LICENSE_FAILED_MSG.to_string();
         }
-
         if is_pipeline_failed {
             println!("\n\n");
             println!("\t\t ================== ❌ Pipeline Failed ==================");

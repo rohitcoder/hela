@@ -1,8 +1,8 @@
 use std::{collections::HashMap, process::Command};
 use serde_json::Value;
+use regex::Regex;
 
 // define static exit codes and message
-
 pub const EXIT_CODE_LICENSE_FAILED: i32 = 101;
 pub const LICENSE_FAILED_MSG: &str = "License scan failed";
 pub const EXIT_CODE_SCA_FAILED: i32 = 102;
@@ -27,6 +27,12 @@ pub fn print_error(error: &str, error_code: i32) {
     if error_code != 101 {
         std::process::exit(error_code);
     }
+}
+
+pub fn count_env_variables(input: &str) -> i128 {
+    let pattern = Regex::new(r"\$\{([^}]*)\}").unwrap();
+    let count = pattern.captures_iter(input).count();
+    count as i128
 }
 
 pub fn redact_github_token(input: &str) -> String {
