@@ -1,11 +1,13 @@
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
+use serde_json::Value;
 
 use crate::utils::common::slack_alert;
 
 use super::common::{self, print_error, redact_github_token};
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
+    // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
 
@@ -508,4 +510,101 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         slack_alert(&slack_url, &slack_alert_msg).await;
         println!("\n\n");
     }
+ 
+    let mut sarif_report = HashMap::new();
+    sarif_report.insert("version", serde_json::Value::String("2.1.0".to_string()));
+    let mut run = serde_json::Map::new();
+    let mut tool = serde_json::Map::new();
+    let mut driver = serde_json::Map::new();
+    driver.insert("name".to_string(), serde_json::Value::String("Hela Security".to_string()));
+    driver.insert("version".to_string(), serde_json::Value::String("1.0.0".to_string()));
+    tool.insert("driver".to_string(), serde_json::Value::Object(driver));
+    let mut results = Vec::new();
+    if is_sast {
+        let mut sast_results = Vec::new();
+        for result in json_output["sast"].as_array().unwrap() {
+            let mut sast_result = serde_json::Map::new();
+            sast_result.insert("ruleId".to_string(), serde_json::Value::String(result["check_id"].as_str().unwrap().to_string()));
+            sast_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
+            let mut message = serde_json::Map::new();
+            message.insert("text".to_string(), serde_json::Value::String(result["extra"]["message"].as_str().unwrap().to_string()));
+            sast_result.insert("message".to_string(), serde_json::Value::Object(message));
+            let mut locations = Vec::new();
+            let mut location = serde_json::Map::new();
+            let mut physical_location = serde_json::Map::new();
+            let mut artifact_location = serde_json::Map::new();
+            artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", result["path"].as_str().unwrap())));
+            physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
+            location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
+            locations.push(serde_json::Value::Object(location));
+            sast_result.insert("locations".to_string(), serde_json::Value::Array(locations));
+            let mut properties = serde_json::Map::new();
+            properties.insert("severity".to_string(), serde_json::Value::String(result["extra"]["severity"].as_str().unwrap().to_string()));
+            sast_result.insert("properties".to_string(), serde_json::Value::Object(properties));
+            sast_results.push(serde_json::Value::Object(sast_result));
+        }
+        results.append(&mut sast_results);
+    }
+    if is_sca {
+        let mut sca_results = Vec::new();
+        for (manifest_file, sca_result) in json_output["sca"].as_object().unwrap() {
+            if sca_result["packages"].as_array().unwrap().len() == 0 {
+                continue;
+            }
+            for package in sca_result["packages"].as_array().unwrap() {
+                for vuln in package["vulnerabilities"].as_array().unwrap() {
+                    let mut sca_result = serde_json::Map::new();
+                    sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
+                    sca_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
+                    let mut message = serde_json::Map::new();
+                    message.insert("text".to_string(), serde_json::Value::String(vuln["summary"].as_str().unwrap().to_string()));
+                    sca_result.insert("message".to_string(), serde_json::Value::Object(message));
+                    let mut locations = Vec::new();
+                    let mut location = serde_json::Map::new();
+                    let mut physical_location = serde_json::Map::new();
+                    let mut artifact_location = serde_json::Map::new();
+                    artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", manifest_file)));
+                    physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
+                    location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
+                    locations.push(serde_json::Value::Object(location));
+                    sca_result.insert("locations".to_string(), serde_json::Value::Array(locations));
+                    let mut properties = serde_json::Map::new();
+                    properties.insert("severity".to_string(), serde_json::Value::String(vuln["database_specific"]["severity"].as_str().unwrap().to_string()));
+                    sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
+                    sca_results.push(serde_json::Value::Object(sca_result));
+                }
+            }
+        }
+        results.append(&mut sca_results);
+    }
+    if is_secret {
+        let mut secret_results = Vec::new();
+        for result in json_output["secret"]["results"].as_array().unwrap() {
+            let mut secret_result = serde_json::Map::new();
+            secret_result.insert("ruleId".to_string(), serde_json::Value::String(result["DetectorName"].as_str().unwrap().to_string()));
+            secret_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
+            let mut message = serde_json::Map::new();
+            message.insert("text".to_string(), serde_json::Value::String(format!("Secret of {} with value {} exposed", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap())));
+            secret_result.insert("message".to_string(), serde_json::Value::Object(message));
+            let mut locations = Vec::new();
+            let mut location = serde_json::Map::new();
+            let mut physical_location = serde_json::Map::new();
+            let mut artifact_location = serde_json::Map::new();
+            artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap())));
+            physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
+            location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
+            locations.push(serde_json::Value::Object(location));
+            secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
+            let mut properties = serde_json::Map::new();
+            properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
+            secret_result.insert("properties".to_string(), serde_json::Value::Object(properties));
+            secret_results.push(serde_json::Value::Object(secret_result));
+        }
+        results.append(&mut secret_results);
+    }
+    run.insert("tool".to_owned(), serde_json::Value::Object(tool));
+    run.insert("results".to_owned(), serde_json::Value::Array(results));
+    sarif_report.insert("runs", serde_json::Value::Array(vec![serde_json::Value::Object(run)]));
+    std::fs::write("/tmp/sarif_report.json", serde_json::to_string_pretty(&sarif_report).unwrap()).unwrap();
+    println!("[+] SARIF report generated at /tmp/sarif_report.json");
 }
