@@ -547,31 +547,33 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     }
     if is_sca {
         let mut sca_results = Vec::new();
-        for (manifest_file, sca_result) in json_output["sca"].as_object().unwrap() {
-            if sca_result["packages"].as_array().unwrap().len() == 0 {
-                continue;
-            }
-            for package in sca_result["packages"].as_array().unwrap() {
-                for vuln in package["vulnerabilities"].as_array().unwrap() {
-                    let mut sca_result = serde_json::Map::new();
-                    sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
-                    sca_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
-                    let mut message = serde_json::Map::new();
-                    message.insert("text".to_string(), serde_json::Value::String(vuln["summary"].as_str().unwrap().to_string()));
-                    sca_result.insert("message".to_string(), serde_json::Value::Object(message));
-                    let mut locations = Vec::new();
-                    let mut location = serde_json::Map::new();
-                    let mut physical_location = serde_json::Map::new();
-                    let mut artifact_location = serde_json::Map::new();
-                    artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", manifest_file)));
-                    physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
-                    location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
-                    locations.push(serde_json::Value::Object(location));
-                    sca_result.insert("locations".to_string(), serde_json::Value::Array(locations));
-                    let mut properties = serde_json::Map::new();
-                    properties.insert("severity".to_string(), serde_json::Value::String(vuln["database_specific"]["severity"].as_str().unwrap().to_string()));
-                    sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
-                    sca_results.push(serde_json::Value::Object(sca_result));
+        if json_output["sca"].as_object().is_some() {
+            for (manifest_file, sca_result) in json_output["sca"].as_object().unwrap() {
+                if sca_result["packages"].as_array().unwrap().len() == 0 {
+                    continue;
+                }
+                for package in sca_result["packages"].as_array().unwrap() {
+                    for vuln in package["vulnerabilities"].as_array().unwrap() {
+                        let mut sca_result = serde_json::Map::new();
+                        sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
+                        sca_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
+                        let mut message = serde_json::Map::new();
+                        message.insert("text".to_string(), serde_json::Value::String(vuln["summary"].as_str().unwrap().to_string()));
+                        sca_result.insert("message".to_string(), serde_json::Value::Object(message));
+                        let mut locations = Vec::new();
+                        let mut location = serde_json::Map::new();
+                        let mut physical_location = serde_json::Map::new();
+                        let mut artifact_location = serde_json::Map::new();
+                        artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", manifest_file)));
+                        physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
+                        location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
+                        locations.push(serde_json::Value::Object(location));
+                        sca_result.insert("locations".to_string(), serde_json::Value::Array(locations));
+                        let mut properties = serde_json::Map::new();
+                        properties.insert("severity".to_string(), serde_json::Value::String(vuln["database_specific"]["severity"].as_str().unwrap().to_string()));
+                        sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
+                        sca_results.push(serde_json::Value::Object(sca_result));
+                    }
                 }
             }
         }
