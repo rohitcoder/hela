@@ -45,9 +45,8 @@ RUN wget https://github.com/trufflesecurity/trufflehog/releases/download/v3.37.0
 RUN go install github.com/google/osv-scanner/cmd/osv-scanner@v1
 
 # Install npm
-# RUN npm install -g @cyclonedx/cdxgen
-RUN install -g pnpm
-# RUN export FETCH_LICENSE=true
+RUN npm install -g @cyclonedx/cdxgen pnpm
+RUN export FETCH_LICENSE=true
 
 
 ENTRYPOINT ["hela"]
