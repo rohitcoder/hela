@@ -7,7 +7,7 @@ COPY src /hela/src
 
 WORKDIR /hela
 
-RUN cargo build +nightly --release \
+RUN cargo build --release \
     && mv /hela/target/release/Hela /usr/local/bin/hela \
     && rm -rf /hela
 
