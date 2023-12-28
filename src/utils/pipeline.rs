@@ -124,7 +124,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             vulnerability.insert("ecosystem", package["package"]["ecosystem"].as_str().unwrap());
             let mut vulns_list = Vec::new();
             for vuln in package["vulnerabilities"].as_array().unwrap() {
-                let mut severity = vuln["database_specific"]["severity"].as_str().unwrap();
+                let mut severity = match vuln["database_specific"]["severity"] {
+                    Value::String(ref severity) => severity,
+                    _ => "UNKNOWN"
+                };
                 if severity == "MODERATE" {
                     severity = "MEDIUM";
                 }
