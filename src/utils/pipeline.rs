@@ -147,6 +147,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                     for cwe_id in vuln["database_specific"]["cwe_id"].as_array().unwrap() {
                         vulnerability.insert("cwe_id", cwe_id.as_str().unwrap());
                     }
+                }else{
+                    vulnerability.insert("cwe_id", "");
                 }
                 
                 if vuln["aliases"].is_array() {
@@ -156,6 +158,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                     }else{
                         vulnerability.insert("aliases", "");
                     }
+                }else{
+                    vulnerability.insert("aliases", "");
                 }
 
                 if severity.to_lowercase() == "warning" {
