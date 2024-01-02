@@ -131,22 +131,31 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                 if severity == "MODERATE" {
                     severity = "MEDIUM";
                 }
-                vulnerability.insert("summary", vuln["summary"].as_str().unwrap());
-                vulnerability.insert("details", vuln["details"].as_str().unwrap());
+                let summary = match vuln["summary"] {
+                    Value::String(ref summary) => summary,
+                    _ => "UNKNOWN"
+                };
+                let details = match vuln["details"] {
+                    Value::String(ref details) => details,
+                    _ => "UNKNOWN"
+                };
+                vulnerability.insert("summary", summary);
+                vulnerability.insert("details", details);
                 vulnerability.insert("severity", severity);
 
-                let cwe_id_array = vuln["database_specific"]["cwe_ids"].as_array().unwrap();
-                if cwe_id_array.len() > 0 {
-                    vulnerability.insert("cwe_id", cwe_id_array[0].as_str().unwrap());
-                }else{
-                    vulnerability.insert("cwe_id", "");
+                if vuln["database_specific"]["cwe_id"].is_array() {
+                    for cwe_id in vuln["database_specific"]["cwe_id"].as_array().unwrap() {
+                        vulnerability.insert("cwe_id", cwe_id.as_str().unwrap());
+                    }
                 }
                 
-                let aliases_array = vuln["aliases"].as_array().unwrap();
-                if aliases_array.len() > 0 {
-                    vulnerability.insert("aliases", aliases_array[0].as_str().unwrap());
-                }else{
-                    vulnerability.insert("aliases", "");
+                if vuln["aliases"].is_array() {
+                    let aliases_array = vuln["aliases"].as_array().unwrap();
+                    if aliases_array.len() > 0 {
+                        vulnerability.insert("aliases", aliases_array[0].as_str().unwrap());
+                    }else{
+                        vulnerability.insert("aliases", "");
+                    }
                 }
 
                 if severity.to_lowercase() == "warning" {
