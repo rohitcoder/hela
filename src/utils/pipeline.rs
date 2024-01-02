@@ -570,11 +570,19 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                 }
                 for package in sca_result["packages"].as_array().unwrap() {
                     for vuln in package["vulnerabilities"].as_array().unwrap() {
+                        let summary = match vuln["summary"] {
+                            Value::String(ref summary) => summary,
+                            _ => "UNKNOWN"
+                        };
+                        let severity = match vuln["database_specific"]["severity"] {
+                            Value::String(ref severity) => severity,
+                            _ => "UNKNOWN"
+                        };
                         let mut sca_result = serde_json::Map::new();
                         sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
                         sca_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
                         let mut message = serde_json::Map::new();
-                        message.insert("text".to_string(), serde_json::Value::String(vuln["summary"].as_str().unwrap().to_string()));
+                        message.insert("text".to_string(), serde_json::Value::String(summary.to_string()));
                         sca_result.insert("message".to_string(), serde_json::Value::Object(message));
                         let mut locations = Vec::new();
                         let mut location = serde_json::Map::new();
@@ -586,7 +594,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         locations.push(serde_json::Value::Object(location));
                         sca_result.insert("locations".to_string(), serde_json::Value::Array(locations));
                         let mut properties = serde_json::Map::new();
-                        properties.insert("severity".to_string(), serde_json::Value::String(vuln["database_specific"]["severity"].as_str().unwrap().to_string()));
+                        properties.insert("severity".to_string(), serde_json::Value::String(severity.to_string()));
                         sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
                         sca_results.push(serde_json::Value::Object(sca_result));
                     }
