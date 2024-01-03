@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::utils::common::{execute_command, print_error, post_json_data};
+use crate::utils::common::{execute_command, print_error, post_json_data, count_env_variables};
 
 pub struct SecretTool;
 
@@ -65,14 +65,22 @@ impl SecretTool {
         let remove_git_folder = format!("rm -rf {}/.git", _path);
         execute_command(&remove_git_folder, true).await;
 
-        let cmd = format!("trufflehog filesystem --no-update {} --json", _path);
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
             let json_output: serde_json::Value = serde_json::from_str(&line).expect("Error parsing JSON");
+            
             // if it have key SourceMetadata only then add it to results
             if json_output["SourceMetadata"].is_null() {
                 continue;
+            }
+
+            // if "Raw" is in json_output and not null then check if it contains environment variables
+            if json_output["Raw"].is_string() && !json_output["Raw"].is_null() {
+                if count_env_variables(&json_output["Raw"].as_str().unwrap()) > 0 {
+                    continue;
+                }
             }
             results.push(json_output);
         }
