@@ -110,6 +110,6 @@ async fn main() {
             println!("{}", output);
         }
     }else {
-        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url).await;
+        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url, commit_id).await;
     }
 }

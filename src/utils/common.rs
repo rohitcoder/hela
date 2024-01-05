@@ -13,6 +13,7 @@ pub const EXIT_CODE_SECRET_FAILED: i32 = 104;
 pub const SECRET_FAILED_MSG: &str = "Secret scan failed";
 
 pub async fn slack_alert(url: &str, message: &str) {
+    println!("{:?}", message);
     let mut payload = HashMap::new();
     payload.insert("text".to_string(), message.to_string());
     let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;

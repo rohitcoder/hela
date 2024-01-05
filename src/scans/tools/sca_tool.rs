@@ -57,7 +57,10 @@ impl ScaTool {
            for detected_file in detected_files.iter() {
              let file_name = detected_file.split("/").last().unwrap();
              let folder_path = detected_file.replace(file_name, "");
-             let language = language_mapping.get(file_name).unwrap().to_string();
+             let language = match language_mapping.get(file_name) {
+                 Some(language) => language.to_string(),
+                 None => "unknown".to_string()
+             };
              if language == "python" {
                 if verbose {
                     println!("[+] Found python manifest file, installing python dependencies for {}", file_name);

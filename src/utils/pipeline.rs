@@ -6,7 +6,7 @@ use crate::utils::common::slack_alert;
 
 use super::common::{self, print_error, redact_github_token};
 
-pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
+pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String){
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
@@ -31,7 +31,14 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // if code_path contains ghp_* thend redact that value because its token
     let redacted_code_path = redact_github_token(&code_path);
 
-    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path).as_str());
+    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path.replace("*", "").replace("@", "")).as_str());
+    let cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
+    let commit_pr_msg = String::new();
+    if !commit_id.is_empty() {
+        let commit_path = format!("{}/commit/{}", cleaned_code_path, commit_id);
+        slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
+    }
+    
     println!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path);
     if is_sast {
 
@@ -82,6 +89,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       if sast_results.len() > 0 {
         found_sast_issues = true;
         println!("\n\n");
+        slack_alert_msg.push_str("\n\n");
+        slack_alert_msg.push_str(format!("{}", commit_pr_msg).as_str());
         println!("\t\t ================== SAST Results ==================");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str("\t\t ================== SAST Results ==================");
