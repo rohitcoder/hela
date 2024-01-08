@@ -10,7 +10,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
-
+    let mut found_issues = false;
     let mut found_sast_issues = false;
     let mut found_sca_issues = false;
     let mut found_secret_issues = false;
@@ -325,6 +325,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
     if found_sast_issues == false && found_sca_issues == false && found_secret_issues == false && found_license_issues == false {
         println!("\n\n\t\t\t No issues found in scan results");
+    }else{
+        found_issues = true;
     }
 
     // Policy implementation
@@ -517,22 +519,28 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             println!("\t\t {}", exit_msg);
             println!("\n\n");
-            slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if found_issues {
+                slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }
             // finish everything and smoothly exit
             exit(exit_code);
         }else{
             println!("\n\n");
             println!("\t\t ================== ✅ Pipeline Passed ==================");
-            slack_alert_msg.push_str("\n\n\t\t ================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if found_issues {
+                slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }
             println!("\n\n");
         }
     }else{
         println!("\n\n");
         println!("\t\t ================== ✅ Pipeline Passed ==================");
-        slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-        slack_alert(&slack_url, &slack_alert_msg).await;
+        if found_issues {
+            slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
+            slack_alert(&slack_url, &slack_alert_msg).await;
+        }
         println!("\n\n");
     }
  
