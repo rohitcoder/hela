@@ -228,7 +228,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut detected_detectors = Vec::new();
     
       let mut secret_results = Vec::new();
-      let mut total_secrets = 0;
       for result in json_output["secret"]["results"].as_array().unwrap() {
         total_secrets_exposed += 1;
           let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {

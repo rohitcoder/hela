@@ -10,13 +10,6 @@ impl SecretTool {
     }
 
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
-        /*
-            1. Clone Repo
-            2. Get Commit ID to scan and checkout to that commit ID using git checkout <Commit-ID>
-            3. Now copy only modified files from that commitID to another folder for scanning using git diff-tree --no-commit-id --name-only -r <Commit-ID> | xargs -I {} cp {} ~/Desktop/code/
-        */
-        // check if path is a local path ore git link and then clone it
-        // if /tmp/app not exists then run below commands
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 if verbose {
@@ -39,7 +32,6 @@ impl SecretTool {
         }
         let mut _path = format!("/tmp/app");
         
-        // if commit_id is provided then checkout to that commit id
         if let Some(commit_id) = _commit_id {
             if verbose {
                 println!("[+] Checking out to commit id: {}", commit_id);
@@ -65,7 +57,7 @@ impl SecretTool {
         let remove_git_folder = format!("rm -rf {}/.git", _path);
         execute_command(&remove_git_folder, true).await;
 
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT", _path);
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
@@ -84,6 +76,18 @@ impl SecretTool {
             }
             results.push(json_output);
         }
+        // ## iterate into each results and implement checks for specific DetectorName
+        let mut new_results: Vec<Value> = Vec::new();
+        for result in results.iter_mut() {
+            if result["DetectorName"].as_str().unwrap() == "JDBC" {
+                // if not contains password then continue
+                if !result["Raw"].as_str().unwrap().contains("password") {
+                    continue;
+                }
+            }
+            new_results.push(result.clone());
+        }   
+        results = new_results;
         let json_output = serde_json::json!({
             "results": results
         });
