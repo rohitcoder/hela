@@ -6,11 +6,11 @@ use crate::utils::common::slack_alert;
 
 use super::common::{self, print_error, redact_github_token};
 
-pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String) {
+pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String){
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
-
+    let mut found_issues = false;
     let mut found_sast_issues = false;
     let mut found_sca_issues = false;
     let mut found_secret_issues = false;
@@ -31,7 +31,14 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // if code_path contains ghp_* thend redact that value because its token
     let redacted_code_path = redact_github_token(&code_path);
 
-    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path).as_str());
+    slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path.replace("*", "").replace("@", "")).as_str());
+    let cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
+    let commit_pr_msg = String::new();
+    if !commit_id.is_empty() {
+        let commit_path = format!("{}/commit/{}", cleaned_code_path, commit_id);
+        slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
+    }
+    
     println!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path);
     if is_sast {
 
@@ -82,6 +89,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       if sast_results.len() > 0 {
         found_sast_issues = true;
         println!("\n\n");
+        slack_alert_msg.push_str("\n\n");
+        slack_alert_msg.push_str(format!("{}", commit_pr_msg).as_str());
         println!("\t\t ================== SAST Results ==================");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str("\t\t ================== SAST Results ==================");
@@ -219,7 +228,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut detected_detectors = Vec::new();
     
       let mut secret_results = Vec::new();
-      let mut total_secrets = 0;
       for result in json_output["secret"]["results"].as_array().unwrap() {
         total_secrets_exposed += 1;
           let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {
@@ -316,6 +324,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
     if found_sast_issues == false && found_sca_issues == false && found_secret_issues == false && found_license_issues == false {
         println!("\n\n\t\t\t No issues found in scan results");
+    }else{
+        found_issues = true;
     }
 
     // Policy implementation
@@ -508,22 +518,28 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             println!("\t\t {}", exit_msg);
             println!("\n\n");
-            slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if found_issues {
+                slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }
             // finish everything and smoothly exit
             exit(exit_code);
         }else{
             println!("\n\n");
             println!("\t\t ================== ✅ Pipeline Passed ==================");
-            slack_alert_msg.push_str("\n\n\t\t ================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if found_issues {
+                slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }
             println!("\n\n");
         }
     }else{
         println!("\n\n");
         println!("\t\t ================== ✅ Pipeline Passed ==================");
-        slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-        slack_alert(&slack_url, &slack_alert_msg).await;
+        if found_issues {
+            slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
+            slack_alert(&slack_url, &slack_alert_msg).await;
+        }
         println!("\n\n");
     }
  
