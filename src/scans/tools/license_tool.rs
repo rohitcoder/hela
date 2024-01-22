@@ -1,5 +1,5 @@
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use mongodb::bson::uuid;
 use serde_json::json;
@@ -15,6 +15,7 @@ impl LicenseTool {
     }
     
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+        let start_time = Instant::now();
         if verbose {
             println!("[+] Running License compliance scan on path: {}", _path);
         }
@@ -111,5 +112,9 @@ impl LicenseTool {
         }
         output_json["license"] = json!(manifest_license);
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        let end_time = Instant::now();
+        let elapsed_time = end_time - start_time;
+        let elapsed_seconds = elapsed_time.as_secs_f64().round();
+        println!("Execution time for License Compliance scan: {:?} seconds", elapsed_seconds);
     }
 }

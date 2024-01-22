@@ -1,4 +1,3 @@
-use std::time::{Instant, Duration};
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
 use serde_json::Value;
@@ -44,7 +43,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     
 
     if is_sast {
-      let start_time = Instant::now();
       let mut pipeline_sast_data: HashMap<&str, i64> = HashMap::new();
       let mut warning_count = 0;
       let mut info_count = 0;
@@ -108,15 +106,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           slack_alert_msg.push_str(&format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]));
       }
       pipeline_sast_sca_data.insert("sast", pipeline_sast_data.clone());
-      let end_time = Instant::now();
-      let elapsed_time = end_time - start_time;
-      let elapsed_seconds = elapsed_time.as_secs_f64();
-      println!("Execution time for SAST scan: {:?} seconds", elapsed_seconds);
     }
 
 
     if is_sca {
-      let start_time = Instant::now();
       let mut pipline_sca_data = HashMap::new();
       let mut warning_count = 0;
       let mut info_count = 0;
@@ -227,16 +220,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         pipline_sca_data.insert("warning_count", warning_count);
         pipline_sca_data.insert("error_count", error_count);
         pipeline_sast_sca_data.insert("sca", pipline_sca_data);
-        let end_time = Instant::now();
-        let elapsed_time = end_time - start_time;
-        let elapsed_seconds = elapsed_time.as_secs_f64();
-        println!("Execution time for SCA scan: {:?} seconds", elapsed_seconds);
     }
     
     let mut total_secrets_exposed = 0;
 
     if is_secret {
-      let start_time = Instant::now();
       let mut detected_detectors = Vec::new();
       let mut secret_results = Vec::new();
       for result in json_output["secret"]["results"].as_array().unwrap() {
@@ -285,14 +273,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         if secret_results.len() > 0 {
             table.printstd();
         }
-        let end_time = Instant::now();
-        let elapsed_time = end_time - start_time;
-        let elapsed_seconds = elapsed_time.as_secs_f64();
-        println!("Execution time for Secret scan: {:?} seconds", elapsed_seconds);
     }
 
     if is_license_compliance {
-        let start_time = Instant::now();
         let mut licenses_list = Vec::new();
 
         let mut license_results = HashMap::new();
@@ -335,10 +318,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       }
       licenses_list = licenses_list.iter().map(|x| x.to_lowercase()).collect::<Vec<String>>();
       pipeline_secret_license_data.insert("licenses", licenses_list);
-      let end_time = Instant::now();
-      let elapsed_time = end_time - start_time;
-      let elapsed_seconds = elapsed_time.as_secs_f64();
-      println!("Execution time for License Compliance scan: {:?} seconds", elapsed_seconds);
     }
 
     if found_sast_issues == false && found_sca_issues == false && found_secret_issues == false && found_license_issues == false {
