@@ -57,6 +57,7 @@ impl SastTool {
             let copy_command = format!("mkdir -p /tmp/code");
             execute_command(&copy_command, true).await;
             let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/code", _path, commit_id, commit_id, commit_id);
+            println!("copy_command: {}", copy_command);
             execute_command(&copy_command, true).await;
             // now run secret scan on /tmp/code folder
             _path = format!("/tmp/code");
@@ -86,9 +87,10 @@ impl SastTool {
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
+        excluded_folders.push("bundles");
         excluded_folders.push("dist");
-        excluded_folders.push(".github");
         excluded_folders.push(".git");
+        
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
         let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
         execute_command(&cmd, true).await;

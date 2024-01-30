@@ -54,11 +54,14 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       for result in json_output["sast"].as_array().unwrap() {
           let mut sast_result = HashMap::new();
-          sast_result.insert("check_id", result["check_id"].as_str().unwrap());
-          sast_result.insert("path", result["path"].as_str().unwrap());
-          sast_result.insert("severity", result["extra"]["severity"].as_str().unwrap());
-          sast_result.insert("message", result["extra"]["message"].as_str().unwrap());
-          sast_result.insert("lines", result["extra"]["lines"].as_str().unwrap());
+          let vuln_path_str = format!("{}:{}", result["path"].as_str().unwrap(), result["path"]["start"]["line"].as_str().unwrap());
+          let vuln_path = String::from(vuln_path_str);
+
+          sast_result.insert("check_id", result["check_id"].to_string());
+          sast_result.insert("path", vuln_path);
+          sast_result.insert("severity", result["extra"]["severity"].to_string());
+          sast_result.insert("message", result["extra"]["message"].to_string());
+          sast_result.insert("lines", result["extra"]["lines"].to_string());
           
           if result["extra"]["severity"].as_str().unwrap().to_lowercase() == "warning" {
               warning_count += 1;
@@ -555,7 +558,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         for result in json_output["sast"].as_array().unwrap() {
             let mut sast_result = serde_json::Map::new();
             sast_result.insert("ruleId".to_string(), serde_json::Value::String(result["check_id"].as_str().unwrap().to_string()));
-            sast_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
             let mut message = serde_json::Map::new();
             message.insert("text".to_string(), serde_json::Value::String(result["extra"]["message"].as_str().unwrap().to_string()));
             sast_result.insert("message".to_string(), serde_json::Value::Object(message));
@@ -594,7 +596,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         };
                         let mut sca_result = serde_json::Map::new();
                         sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
-                        sca_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
                         let mut message = serde_json::Map::new();
                         message.insert("text".to_string(), serde_json::Value::String(summary.to_string()));
                         sca_result.insert("message".to_string(), serde_json::Value::Object(message));
@@ -622,7 +623,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         for result in json_output["secret"]["results"].as_array().unwrap() {
             let mut secret_result = serde_json::Map::new();
             secret_result.insert("ruleId".to_string(), serde_json::Value::String(result["DetectorName"].as_str().unwrap().to_string()));
-            secret_result.insert("ruleIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(1)));
             let mut message = serde_json::Map::new();
             message.insert("text".to_string(), serde_json::Value::String(format!("Secret of {} with value {} exposed", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap())));
             secret_result.insert("message".to_string(), serde_json::Value::Object(message));
