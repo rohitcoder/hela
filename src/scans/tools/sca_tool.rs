@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use serde_json::{json, Value};
 
@@ -147,6 +147,7 @@ impl ScaTool {
     }
 
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
+        let start_time = Instant::now();
         if verbose {
             println!("[+] Running SCA scan on path: {}", _path);
             println!("[+] Commit ID: {}", _commit_id.unwrap_or("None"));
@@ -295,5 +296,10 @@ impl ScaTool {
         }
         output_json["sca"] = json!(mainfest_sca_result);
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+
+        let end_time = Instant::now();
+        let elapsed_time = end_time - start_time;
+        let elapsed_seconds = elapsed_time.as_secs_f64().round();
+        println!("Execution time for SCA scan: {:?} seconds", elapsed_seconds);
     }
 }

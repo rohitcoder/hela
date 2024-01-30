@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use serde_json::json;
 
 use crate::utils::common::{execute_command, print_error, post_json_data};
@@ -10,6 +12,7 @@ impl SastTool {
     }
 
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, rule_path: String, verbose: bool) {
+        let start_time = Instant::now();
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path);
         }
@@ -54,6 +57,7 @@ impl SastTool {
             let copy_command = format!("mkdir -p /tmp/code");
             execute_command(&copy_command, true).await;
             let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/code", _path, commit_id, commit_id, commit_id);
+            println!("copy_command: {}", copy_command);
             execute_command(&copy_command, true).await;
             // now run secret scan on /tmp/code folder
             _path = format!("/tmp/code");
@@ -80,7 +84,15 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan...");
         }
-        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json", _path);
+        let mut excluded_folders = Vec::new();
+        excluded_folders.push("node_modules");
+        excluded_folders.push("build");
+        excluded_folders.push("bundles");
+        excluded_folders.push("dist");
+        excluded_folders.push(".git");
+        
+        let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
+        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
         execute_command(&cmd, true).await;
         if verbose {
             println!("[+] SAST scan completed!");
@@ -118,5 +130,10 @@ impl SastTool {
         output_json["sast"] = serde_json::Value::Array(json_output.clone());
 
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+
+        let end_time = Instant::now();
+        let elapsed_time = end_time - start_time;
+        let elapsed_seconds = elapsed_time.as_secs_f64().round();
+        println!("Execution time for SAST scan: {:?} seconds", elapsed_seconds);
     }
 }

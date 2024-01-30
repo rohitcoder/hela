@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use serde_json::{Value, json};
 
 use crate::utils::common::{execute_command, print_error, post_json_data, count_env_variables};
@@ -10,7 +12,8 @@ impl SecretTool {
     }
 
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
-        if !std::path::Path::new("/tmp/app").exists() {
+      let start_time = Instant::now();
+      if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 if verbose {
                     println!("[+] Cloning git repo...");
@@ -57,7 +60,7 @@ impl SecretTool {
         let remove_git_folder = format!("rm -rf {}/.git", _path);
         execute_command(&remove_git_folder, true).await;
 
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA", _path);
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,ALIBABA", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
@@ -123,5 +126,10 @@ impl SecretTool {
         }
         output_json["secret"] = json_output.clone();
         std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+
+        let end_time = Instant::now();
+        let elapsed_time = end_time - start_time;
+        let elapsed_seconds = elapsed_time.as_secs_f64().round();
+        println!("Execution time for Secret scan: {:?} seconds", elapsed_seconds);
     }
 }
