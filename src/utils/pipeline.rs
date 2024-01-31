@@ -54,7 +54,15 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       for result in json_output["sast"].as_array().unwrap() {
           let mut sast_result = HashMap::new();
-          let vuln_path_str = format!("{}:{}", result["path"].as_str().unwrap(), result["start"]["line"].as_str().unwrap());
+          let vuln_path_result = match result["path"].as_str() {
+              Some(path) => path,
+              None => "UNKNOWN"
+          };
+          let vuln_path_line = match result["start"]["line"].as_i64() {
+              Some(line) => line,
+              None => 0
+          };
+          let vuln_path_str = format!("{}:{}", vuln_path_result, vuln_path_line);
           let vuln_path = String::from(vuln_path_str);
 
           sast_result.insert("check_id", result["check_id"].to_string());
