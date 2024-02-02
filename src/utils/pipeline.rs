@@ -54,7 +54,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       for result in json_output["sast"].as_array().unwrap() {
           let mut sast_result = HashMap::new();
-          println!("{:?}", result);
           let vuln_path_result = match result["path"].as_str() {
               Some(path) => path,
               None => "UNKNOWN"

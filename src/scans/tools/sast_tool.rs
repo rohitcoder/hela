@@ -88,6 +88,8 @@ impl SastTool {
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
+        excluded_folders.push("charts");
+        excluded_folders.push("public");
         excluded_folders.push("dist");
         excluded_folders.push(".git");
         
