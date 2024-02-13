@@ -1,6 +1,9 @@
 use std::{collections::HashMap, process::Command};
 use serde_json::Value;
 use regex::Regex;
+use mongodb::{options::ClientOptions, Client};
+use mongodb::bson::{doc, Document};
+use sha2::{Digest, Sha256};
 
 // define static exit codes and message
 pub const EXIT_CODE_LICENSE_FAILED: i32 = 101;
@@ -12,10 +15,45 @@ pub const SAST_FAILED_MSG: &str = "SAST failed";
 pub const EXIT_CODE_SECRET_FAILED: i32 = 104;
 pub const SECRET_FAILED_MSG: &str = "Secret scan failed";
 
-pub async fn slack_alert(url: &str, message: &str) {
+fn hash_text(input: &str) -> String {
+    // Create a SHA-256 hasher.
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let hashed_string = format!("{:x}", hasher.finalize());
+    hashed_string
+}
+
+pub async fn slack_alert(url: &str, message: &str, mongo_uri: &str) {
     let mut payload = HashMap::new();
     payload.insert("text".to_string(), message.to_string());
-    let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+    // if document found print, there is already one hash, otherwise post_json_data
+    let hashed_message = hash_text(message);
+    if mongo_uri == "" {
+        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+        return;
+    }
+    match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
+        Ok(client) => {
+            match find_message_in_hashes(&client, &hashed_message).await {
+                Ok(result) => {
+                    if result.is_none() {
+                        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+                        let collection = client.database("code-security-open-source").collection("hashes");
+                        let document = doc! { "message": hashed_message };
+                        collection.insert_one(document, None).await.unwrap();
+                    }else{
+                        println!("[❕] Alert already sent for this message");
+                    }
+                },
+                Err(e) => {
+                    print_error(&format!("Error: {}", e.to_string()), 101);
+                }
+            }
+        },
+        Err(e) => {
+            print_error(&format!("Error: {}", e.to_string()), 101);
+        }
+    }
 }
 
 pub fn print_error(error: &str, error_code: i32) {
@@ -40,6 +78,19 @@ pub fn redact_github_token(input: &str) -> String {
     let secret = exploded[0].split("/").last().unwrap();
     let redacted_string = input.replace(secret, "********");
     redacted_string
+}
+
+async fn connect_to_mongodb(mongo_uri: &str, db_name: &str) -> Result<Client, mongodb::error::Error> {
+    let client_options = ClientOptions::parse(mongo_uri).await?;
+    let client = Client::with_options(client_options)?;
+    Ok(client)
+}
+
+async fn find_message_in_hashes(client: &Client, message: &str) -> Result<Option<Document>, mongodb::error::Error> {
+    let collection = client.database("code-security-open-source").collection("hashes");
+    let filter = doc! { "message": message };
+    let result = collection.find_one(filter, None).await?;
+    Ok(result)
 }
 
 pub async fn execute_command(command: &str, suppress_error: bool) -> String {
