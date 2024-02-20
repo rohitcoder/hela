@@ -7,11 +7,16 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: org-level-runner
 
     steps:
       - name: Checkout Code of Hela
         uses: actions/checkout@v2
+
+      - name: Print Architecture and OS
+        run: |
+          echo "Architecture: $(uname -m)"
+          echo "Operating System: $(uname -s)"
 
       - name: Install dependencies
         run: |
