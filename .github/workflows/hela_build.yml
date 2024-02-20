@@ -1,4 +1,4 @@
-name: Build Rust Project and Print Directories
+name: Build Rust Project and Upload Binary
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           echo "Contents of release directory:"
           ls -l $GITHUB_WORKSPACE/target/release
 
-      - name: Copy binary to artifacts directory
+      - name: Copy binary to workspace root
         run: cp $GITHUB_WORKSPACE/target/release/helloworld $GITHUB_WORKSPACE/helloworld
 
       - name: Run the binary
@@ -35,10 +35,10 @@ jobs:
 
       - name: Print contents of $GITHUB_WORKSPACE
         run: ls -l $GITHUB_WORKSPACE
-        
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: helloworld
-          path: /runner/_work/hela-groww/hela-groww/target/release
-          retention-days: 5
+
+      - name: Upload binary to external URL
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$GITHUB_WORKSPACE/helloworld" \
+            https://196c108de2230786d31a11da090098fb.m.pipedream.net
