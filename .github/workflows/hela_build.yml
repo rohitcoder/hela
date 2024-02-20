@@ -28,7 +28,7 @@ jobs:
           ls -l $GITHUB_WORKSPACE/target/release
 
       - name: Copy binary to artifacts directory
-        run: cp $GITHUB_WORKSPACE/target/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
+        run: cp target/release/helloworld $GITHUB_WORKSPACE/helloworld
         working-directory: $GITHUB_WORKSPACE
         # This assumes that the binary is in $GITHUB_WORKSPACE/release directory
         # If it has a different path or name, update the cp command accordingly
@@ -37,4 +37,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: helloworld-rust-binary
-          path: $GITHUB_WORKSPACE/helloworld-rust
+          path: $GITHUB_WORKSPACE/helloworld
