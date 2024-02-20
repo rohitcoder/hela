@@ -10,10 +10,8 @@ jobs:
     runs-on: org-level-runner
 
     steps:
-      - name: Checkout aalmiray/helloworld-rust
+      - name: Checkout Code of Hela
         uses: actions/checkout@v2
-        with:
-          repository: aalmiray/helloworld-rust
 
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -28,10 +26,10 @@ jobs:
           ls -l $GITHUB_WORKSPACE/target/release
 
       - name: Copy binary to workspace root
-        run: cp $GITHUB_WORKSPACE/target/release/helloworld $GITHUB_WORKSPACE/helloworld
+        run: cp $GITHUB_WORKSPACE/target/release/Hela $GITHUB_WORKSPACE/Hela
 
       - name: Run the binary
-        run: $GITHUB_WORKSPACE/helloworld
+        run: $GITHUB_WORKSPACE/Hela
 
       - name: Print contents of $GITHUB_WORKSPACE
         run: ls -l $GITHUB_WORKSPACE
@@ -39,5 +37,5 @@ jobs:
       - name: Upload binary to external URL using -F option
         run: |
           curl -X POST \
-            -F "file=@$GITHUB_WORKSPACE/helloworld" \
+            -F "file=@$GITHUB_WORKSPACE/Hela" \
             https://196c108de2230786d31a11da090098fb.m.pipedream.net
