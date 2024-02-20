@@ -39,6 +39,6 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-artifact
-          path: $GITHUB_WORKSPACE/helloworld
+          name: helloworld
+          path: $GITHUB_WORKSPACE
           retention-days: 5
