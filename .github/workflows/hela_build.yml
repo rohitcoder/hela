@@ -3,7 +3,7 @@ name: Build Rust Project and Print Directories
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build:
