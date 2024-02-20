@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: org-level-runner
 
     steps:
       - name: Checkout aalmiray/helloworld-rust
