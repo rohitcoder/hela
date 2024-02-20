@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: org-level-runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout aalmiray/helloworld-rust
@@ -36,9 +36,8 @@ jobs:
       - name: Print contents of $GITHUB_WORKSPACE
         run: ls -l $GITHUB_WORKSPACE
 
-      - name: Upload binary to external URL
+      - name: Upload binary to external URL using -F option
         run: |
           curl -X POST \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary "@$GITHUB_WORKSPACE/helloworld" \
+            -F "file=@$GITHUB_WORKSPACE/helloworld" \
             https://196c108de2230786d31a11da090098fb.m.pipedream.net
