@@ -28,9 +28,15 @@ jobs:
           ls -l | grep '^d'
           # Print the name of the current directory
           echo "Current Directory: $GITHUB_WORKSPACE/$(basename $PWD)"
+          # Print the list of contents in the release directory
+          echo "Contents of release directory:"
+          ls -l $GITHUB_WORKSPACE/release
 
       - name: Copy binary to artifacts directory
-        run: cp $GITHUB_WORKSPACE/target/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
+        run: cp $GITHUB_WORKSPACE/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
+        working-directory: $GITHUB_WORKSPACE
+        # This assumes that the binary is in $GITHUB_WORKSPACE/release directory
+        # If it has a different path or name, update the cp command accordingly
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
