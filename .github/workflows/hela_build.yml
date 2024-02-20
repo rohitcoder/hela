@@ -1,0 +1,29 @@
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build Rust project
+        run: cargo build --release
+
+      - name: Copy binary to artifacts directory
+        run: cp target/release/Hela $GITHUB_WORKSPACE/Hela
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: Hela-binary
+          path: $GITHUB_WORKSPACE/Hela
