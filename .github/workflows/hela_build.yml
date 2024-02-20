@@ -15,7 +15,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apk add --no-cache pkgconfig openssl-dev
+          apt-get install pkg-config libssl-dev
           
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
