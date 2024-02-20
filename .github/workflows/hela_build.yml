@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: org-level-runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code of Hela
@@ -15,11 +15,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt-get install pkg-config libssl-dev
-          
+          apt-get update
+          apt-get install -y pkg-config libssl-dev
+
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: stable
 
       - name: Build Rust project
