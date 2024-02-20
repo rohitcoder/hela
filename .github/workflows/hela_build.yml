@@ -24,16 +24,11 @@ jobs:
       - name: Build Rust project
         run: |
           cargo build --release
-          # Print list of directories in the current directory
-          ls -l | grep '^d'
-          # Print the name of the current directory
-          echo "Current Directory: $GITHUB_WORKSPACE/$(basename $PWD)"
-          # Print the list of contents in the release directory
           echo "Contents of release directory:"
-          ls -l $GITHUB_WORKSPACE/release
+          ls -l $GITHUB_WORKSPACE/target/release
 
       - name: Copy binary to artifacts directory
-        run: cp $GITHUB_WORKSPACE/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
+        run: cp $GITHUB_WORKSPACE/target/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
         working-directory: $GITHUB_WORKSPACE
         # This assumes that the binary is in $GITHUB_WORKSPACE/release directory
         # If it has a different path or name, update the cp command accordingly
