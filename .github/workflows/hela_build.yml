@@ -1,29 +1,39 @@
+name: Build Rust Project and Print Directories
+
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Rust
+      - name: Checkout aalmiray/helloworld-rust
         uses: actions/checkout@v2
         with:
-          rust-version: stable
+          repository: aalmiray/helloworld-rust
+
+      - name: Set up Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
 
       - name: Build Rust project
-        run: cargo build --release
+        run: |
+          cargo build --release
+          # Print list of directories in the current directory
+          ls -l | grep '^d'
+          # Print the name of the current directory
+          echo "Current Directory: $GITHUB_WORKSPACE/$(basename $PWD)"
 
       - name: Copy binary to artifacts directory
-        run: cp target/release/Hela $GITHUB_WORKSPACE/Hela
+        run: cp target/release/helloworld-rust $GITHUB_WORKSPACE/helloworld-rust
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: Hela-binary
-          path: $GITHUB_WORKSPACE/Hela
+          name: helloworld-rust-binary
+          path: $GITHUB_WORKSPACE/helloworld-rust
