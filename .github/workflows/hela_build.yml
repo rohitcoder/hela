@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: helloworld
-          path: $GITHUB_WORKSPACE
+          path: /runner/_work/hela-groww/hela-groww/target/release
           retention-days: 5
