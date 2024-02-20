@@ -13,6 +13,10 @@ jobs:
       - name: Checkout Code of Hela
         uses: actions/checkout@v2
 
+      - name: Install dependencies
+        run: |
+          apk add --no-cache pkgconfig openssl-dev
+          
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
