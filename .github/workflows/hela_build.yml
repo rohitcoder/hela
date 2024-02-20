@@ -30,6 +30,12 @@ jobs:
       - name: Copy binary to artifacts directory
         run: cp $GITHUB_WORKSPACE/target/release/helloworld $GITHUB_WORKSPACE/helloworld
 
+      - name: Run the binary
+        run: $GITHUB_WORKSPACE/helloworld
+
+      - name: Print contents of $GITHUB_WORKSPACE
+        run: ls -l $GITHUB_WORKSPACE
+
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
