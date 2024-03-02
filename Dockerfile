@@ -7,9 +7,9 @@ COPY src /hela/src
 
 WORKDIR /hela
 
-RUN cargo build --release \
-    && mv /hela/target/release/Hela /usr/local/bin/hela \
-    && rm -rf /hela
+RUN cargo build --release
+RUN mv /hela/target/release/Hela /usr/local/bin/hela
+RUN rm -rf /hela
 
 # Update the package list and upgrade the system
 RUN apt-get update && \
