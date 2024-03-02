@@ -51,11 +51,11 @@ impl SecretTool {
             _path = format!("/tmp/code");
         }
 
-        let cmd = "trufflehog";
-        let out = execute_command(cmd, true).await;
-        if out == "" {
-            print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
-        }
+        // let cmd = "trufflehog";
+        // let out = execute_command(cmd, true).await;
+        // if out == "" {
+        //     print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
+        // }
 
         let remove_git_folder = format!("rm -rf {}/.git", _path);
         execute_command(&remove_git_folder, true).await;
