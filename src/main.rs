@@ -2,7 +2,7 @@ mod scans;
 mod utils;
 
 
-
+use tokio::main;
 use scans::scanner::ScanRunner;
 use utils::pipeline;
 use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
@@ -18,8 +18,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
 
     scanner.execute_scan(scan_type, path, commit_id, branch, server_url, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
 }
-
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     // Parse command-line arguments
     let mut no_install = false;
