@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM rust:nightly
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
 
 COPY Cargo.toml /hela/Cargo.toml
