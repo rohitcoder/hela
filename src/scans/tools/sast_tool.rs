@@ -69,11 +69,11 @@ impl SastTool {
             if rule_path != "" && rule_path.starts_with("http") {
                 println!("[+] Downloading Rules from {}", rule_path);
                 let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
-                execute_command(&clone_command, true).await;
+                execute_command(&clone_command, false).await;
             }else {
                 println!("[+] Downloading Rules from default repo");
                 let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
-                execute_command(&clone_command, true).await;
+                execute_command(&clone_command, false).await;
             }
             if verbose {
                 println!("[+] Rules Downloaded");
@@ -94,7 +94,7 @@ impl SastTool {
         excluded_folders.push(".git");
         
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
-        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
+        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --jso -o /tmp/sast_output.json {}", _path, exclude_flags);
         execute_command(&cmd, true).await;
         if verbose {
             println!("[+] SAST scan completed!");
