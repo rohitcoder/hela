@@ -80,7 +80,6 @@ impl SastTool {
             }
         }
 
-        // Lets RUN SAST SCAN using let cmd = format!("semgrep --config {}/sast-rules {} {} {} --verbose --metrics off --max-target-bytes 1000000 --json -o {}/sast_output.json", tmp_folder, folder_path, exclude_flags, exclude_rules, tmp_folder);
         if verbose {
             println!("[+] Running SAST scan...");
         }
