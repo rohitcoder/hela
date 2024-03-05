@@ -36,11 +36,9 @@ ENV GOPATH=$HOME/go
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 
 # Install trufflehog
+## curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
-RUN wget https://github.com/trufflesecurity/trufflehog/releases/download/v3.37.0/trufflehog_3.37.0_linux_arm64.tar.gz && \
-    tar -xvf trufflehog_3.37.0_linux_arm64.tar.gz && \
-    mv trufflehog /usr/local/bin/ && \
-    rm trufflehog_3.37.0_linux_arm64.tar.gz
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
 RUN go install github.com/google/osv-scanner/cmd/osv-scanner@v1
 
