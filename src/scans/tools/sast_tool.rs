@@ -69,12 +69,16 @@ impl SastTool {
             if rule_path != "" && rule_path.starts_with("http") {
                 println!("[+] Downloading Rules from {}", rule_path);
                 let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
-                execute_command(&clone_command, false).await;
+                execute_command(&clone_command, true).await;
             }else {
                 println!("[+] Downloading Rules from default repo");
                 let clone_command = format!("git clone https://github.com/rohitcodergroww/semgrep-rules /tmp/sast-rules");
-                execute_command(&clone_command, false).await;
+                execute_command(&clone_command, true).await;
             }
+            // Remove .github folder from rules
+            let remove_git_folder = format!("rm -rf /tmp/sast-rules/.github");
+            execute_command(&remove_git_folder, true).await;
+
             if verbose {
                 println!("[+] Rules Downloaded");
             }
