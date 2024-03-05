@@ -6,7 +6,7 @@ use crate::utils::common::slack_alert;
 
 use super::common::{self, print_error, redact_github_token};
 
-pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String){
+pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String) {
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
@@ -32,7 +32,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let redacted_code_path = redact_github_token(&code_path);
 
     slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path.replace("*", "").replace("@", "")).as_str());
-    let cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
+    let mut cleaned_code_path = code_path.clone();
+    if code_path.contains("@") {
+        cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
+    }
     let commit_pr_msg = String::new();
     if !commit_id.is_empty() {
         let commit_path = format!("{}/commit/{}", cleaned_code_path, commit_id);
@@ -54,7 +57,15 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       for result in json_output["sast"].as_array().unwrap() {
           let mut sast_result = HashMap::new();
-          let vuln_path_str = format!("{}:{}", result["path"].as_str().unwrap(), result["start"]["line"].as_str().unwrap());
+          let vuln_path_result = match result["path"].as_str() {
+              Some(path) => path,
+              None => "UNKNOWN"
+          };
+          let vuln_path_line = match result["start"]["line"].as_i64() {
+              Some(line) => line,
+              None => 0
+          };
+          let vuln_path_str = format!("{}:{}", vuln_path_result, vuln_path_line);
           let vuln_path = String::from(vuln_path_str);
 
           sast_result.insert("check_id", result["check_id"].to_string());
@@ -521,7 +532,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             if found_issues {
                 slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
             }
             // finish everything and smoothly exit
             exit(exit_code);
@@ -530,7 +541,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\t\t ================== ✅ Pipeline Passed ==================");
             if found_issues {
                 slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
             }
             println!("\n\n");
         }
@@ -539,7 +550,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         println!("\t\t ================== ✅ Pipeline Passed ==================");
         if found_issues {
             slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
         }
         println!("\n\n");
     }

@@ -1,5 +1,5 @@
 FROM rust:latest
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2024-02-04
 
 COPY Cargo.toml /hela/Cargo.toml
 COPY Cargo.lock /hela/Cargo.lock
@@ -7,9 +7,9 @@ COPY src /hela/src
 
 WORKDIR /hela
 
-RUN cargo build --release \
-    && mv /hela/target/release/Hela /usr/local/bin/hela \
-    && rm -rf /hela
+RUN cargo build --release
+RUN mv /hela/target/release/Hela /usr/local/bin/hela
+RUN rm -rf /hela
 
 # Update the package list and upgrade the system
 RUN apt-get update && \
@@ -36,11 +36,9 @@ ENV GOPATH=$HOME/go
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
 
 # Install trufflehog
+## curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
-RUN wget https://github.com/trufflesecurity/trufflehog/releases/download/v3.37.0/trufflehog_3.37.0_linux_arm64.tar.gz && \
-    tar -xvf trufflehog_3.37.0_linux_arm64.tar.gz && \
-    mv trufflehog /usr/local/bin/ && \
-    rm trufflehog_3.37.0_linux_arm64.tar.gz
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
 RUN go install github.com/google/osv-scanner/cmd/osv-scanner@v1
 

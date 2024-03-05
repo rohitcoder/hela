@@ -69,18 +69,17 @@ impl SastTool {
             if rule_path != "" && rule_path.starts_with("http") {
                 println!("[+] Downloading Rules from {}", rule_path);
                 let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
-                execute_command(&clone_command, true).await;
+                execute_command(&clone_command, false).await;
             }else {
                 println!("[+] Downloading Rules from default repo");
-                let clone_command = format!("git clone {} /tmp/sast-rules", "https://github.com/rohitcodergroww/semgrep-rules");
-                execute_command(&clone_command, true).await;
+                let clone_command = format!("git clone https://github.com/rohitcodergroww/semgrep-rules /tmp/sast-rules");
+                execute_command(&clone_command, false).await;
             }
             if verbose {
                 println!("[+] Rules Downloaded");
             }
         }
 
-        // Lets RUN SAST SCAN using let cmd = format!("semgrep --config {}/sast-rules {} {} {} --verbose --metrics off --max-target-bytes 1000000 --json -o {}/sast_output.json", tmp_folder, folder_path, exclude_flags, exclude_rules, tmp_folder);
         if verbose {
             println!("[+] Running SAST scan...");
         }
@@ -88,6 +87,8 @@ impl SastTool {
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
+        excluded_folders.push("charts");
+        excluded_folders.push("public");
         excluded_folders.push("dist");
         excluded_folders.push(".git");
         

@@ -2,7 +2,7 @@ mod scans;
 mod utils;
 
 
-
+use tokio::main;
 use scans::scanner::ScanRunner;
 use utils::pipeline;
 use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
@@ -18,8 +18,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
 
     scanner.execute_scan(scan_type, path, commit_id, branch, server_url, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
 }
-
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     // Parse command-line arguments
     let mut no_install = false;
@@ -39,6 +38,7 @@ async fn main() {
     let mut manifests = String::new();
     let mut json = false;
     let mut slack_url = String::new();
+    let mut mongo_uri = String::new();
 
     {
         let mut ap = ArgumentParser::new();
@@ -77,13 +77,19 @@ async fn main() {
             .add_option(&["-m", "--manifests"], Store, "Pass the manifests pom.xml, requirements.txt etc to scan and we will look for only that kind of manifests");
         ap.refer(&mut slack_url)
             .add_option(&["-k", "--slack-url"], Store, "Pass the slack url to receive scan alerts");
+        ap.refer(&mut mongo_uri)
+            .add_option(&["-o", "--mongo-uri"], Store, "Pass the mongo uri to store scan results");
         ap.parse_args_or_exit();
     }
 
     if verbose {
         println!("[+] Verbose mode enabled!");
     }
-
+    if mongo_uri != "" {
+        println!("dbConnection");
+    }else{
+        println!("No mongo uri provided");
+    }
     if is_sast {
         execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
@@ -110,6 +116,6 @@ async fn main() {
             println!("{}", output);
         }
     }else {
-        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url, commit_id).await;
+        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url, commit_id, mongo_uri).await;
     }
 }
