@@ -94,7 +94,7 @@ impl SastTool {
         excluded_folders.push(".git");
         
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
-        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --jso -o /tmp/sast_output.json {}", _path, exclude_flags);
+        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
         execute_command(&cmd, true).await;
         if verbose {
             println!("[+] SAST scan completed!");
