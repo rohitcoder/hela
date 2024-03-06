@@ -119,6 +119,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           table.add_row(row![sast_count, result["path"], result["severity"], result["message"].chars().take(50).collect::<String>()]);
           slack_alert_msg.push_str(&format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]));
       }
+      table.printstd();
       pipeline_sast_sca_data.insert("sast", pipeline_sast_data.clone());
     }
 
