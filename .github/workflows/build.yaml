@@ -26,7 +26,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: asia.gcr.io/mgmt-infra-applayer-01-0864/hela:0.1
+          tags: asia.gcr.io/mgmt-infra-applayer-01-0864/hela:0.2
 
       - name: Logout from GCR for mgmt-infra-applayer-01-0864/hela:0.1
         run: docker logout asia.gcr.io
