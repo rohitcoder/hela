@@ -20,17 +20,17 @@ impl SecretTool {
                 }
                 if let Some(_branch) = _branch {
                     let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
-                    execute_command(&clone_command, true).await;
+                    execute_command(&clone_command, false).await;
                 }else{
                     let clone_command = format!("git clone {} /tmp/app", _path);
-                    execute_command(&clone_command, true).await;
+                    execute_command(&clone_command, false).await;
                 }
             }else{
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
                 let copy_command = format!("cp -r {} /tmp/app", _path);
-                execute_command(&copy_command, true).await;
+                execute_command(&copy_command, false).await;
             }
         }
         let mut _path = format!("/tmp/app");

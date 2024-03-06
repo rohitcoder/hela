@@ -107,7 +107,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
                 Ok(output) => output,
                 Err(e) => {
                     if !suppress_error {
-                        println!("{:?}", e.to_string());
                         print_error(&format!("Error: {} : {}", &command.to_string(), e.to_string()), 101);
                     }
                     return "".to_string();
@@ -118,7 +117,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
             Ok(output) => output,
             Err(e) => {
                 if !suppress_error {
-                    println!("{:?}", e.to_string());
                     print_error(&format!("Error: {} : {}", &command.to_string(), e.to_string()), 101);
                 }
                 return "".to_string();
