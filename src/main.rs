@@ -86,9 +86,7 @@ async fn main() {
         println!("[+] Verbose mode enabled!");
     }
     if mongo_uri != "" {
-        println!("dbConnection");
-    }else{
-        println!("No mongo uri provided");
+        println!("[+] Found DbConnection, we will be using it for filtering out the results");
     }
     if is_sast {
         execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;

@@ -1,10 +1,10 @@
 use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::utils::common::slack_alert;
 
-use super::common::{self, print_error, redact_github_token};
+use super::common::{self, execute_command, print_error, redact_github_token};
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String) {
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
@@ -557,6 +557,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     }
  
     let mut sarif_report = HashMap::new();
+    sarif_report.insert("$schema", serde_json::Value::String("https://json.schemastore.org/sarif-2.1.0.json".to_string()));
     sarif_report.insert("version", serde_json::Value::String("2.1.0".to_string()));
     let mut run = serde_json::Map::new();
     let mut tool = serde_json::Map::new();
@@ -584,6 +585,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             sast_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String(result["extra"]["severity"].as_str().unwrap().to_string()));
+            let commiter_info = get_commit_info(result["start"]["line"].as_u64().unwrap(), result["end"]["line"].as_u64().unwrap(), result["path"].as_str().unwrap()).await;
+            let mut tags = Vec::new();
+            tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+            properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             sast_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             sast_results.push(serde_json::Value::Object(sast_result));
         }
@@ -649,6 +654,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
+            let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
+            let mut tags = Vec::new();
+            tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+            properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             secret_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             secret_results.push(serde_json::Value::Object(secret_result));
         }
@@ -659,4 +668,40 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     sarif_report.insert("runs", serde_json::Value::Array(vec![serde_json::Value::Object(run)]));
     std::fs::write("/tmp/sarif_report.json", serde_json::to_string_pretty(&sarif_report).unwrap()).unwrap();
     println!("[+] SARIF report generated at /tmp/sarif_report.json");
+}
+
+
+pub async fn get_commit_info(start_line: u64, end_line: u64, path: &str) -> Value {
+    let folder = "/tmp/app/".to_string();
+    let mut path = path.replace("/tmp/app/", "");
+    path = path.replace("/code/", "/app/");
+    let cmd = format!("cd {} && git blame -L {},{} {} --show-email -l -t -p", folder, start_line, end_line, path.clone());
+    println!("cmd: {}", cmd);
+    let output = execute_command(&cmd, false).await;
+
+    if output.is_empty() {
+        return json!({"name":null,"email":null,"time":null,"tz":null,"commit_hash":null});
+    }
+
+    let mut name = "";
+    let mut email = "";
+
+    let commit_hash = output.lines().next().unwrap().split_whitespace().next().unwrap();
+    for line in output.lines() {
+        if line.starts_with("committer ") {
+            name = line.split("committer ").last().unwrap();
+        }
+        if line.starts_with("committer-mail") {
+            email = match line.split_whitespace().last() {
+                Some(email) => email.trim_start_matches("<").trim_end_matches(">"),
+                None => "",
+            }
+        }
+    }
+
+    return json!({
+        "name": name,
+        "email": email,
+        "commit_hash": commit_hash
+    });
 }
