@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use serde_json::json;
 
@@ -36,13 +36,6 @@ impl SastTool {
                 execute_command(&copy_command, true).await;
             }
         }
-
-        let cmd = "semgrep --version";
-        let out = execute_command(cmd, false).await;
-        if out == "" {
-            print_error("Error: SAST Scanner is not configured properly, please contact support team!", 101);
-        }
-        
         
         let mut _path = format!("/tmp/app");
 
@@ -87,14 +80,28 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan...");
         }
+        
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
-        excluded_folders.push("charts");
-        excluded_folders.push("public");
         excluded_folders.push("dist");
-        excluded_folders.push(".git");
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+        
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
         
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
         let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);

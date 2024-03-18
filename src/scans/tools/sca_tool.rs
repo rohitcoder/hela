@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, fs, time::Instant};
 
 use serde_json::{json, Value};
 
@@ -196,6 +196,38 @@ impl ScaTool {
             }
         }
         let mut _path = format!("/tmp/app");
+
+        let mut excluded_folders = Vec::new();
+        excluded_folders.push("node_modules");
+        excluded_folders.push("build");
+        excluded_folders.push("bundles");
+        excluded_folders.push("dist");
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+
+
+        let mut excluded_folders = Vec::new();
+        excluded_folders.push("node_modules");
+        excluded_folders.push("build");
+        excluded_folders.push("bundles");
+        excluded_folders.push("dist");
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+        
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
+        
         if let Some(commit_id) = _commit_id {
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
             execute_command(&checkout_command, true).await;

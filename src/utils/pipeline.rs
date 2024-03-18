@@ -14,7 +14,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let mut found_sast_issues = false;
     let mut found_sca_issues = false;
     let mut found_secret_issues = false;
-    let mut found_license_issues = false;
+    let found_license_issues = false;
 
     let mut exit_code = 1;
     let mut exit_msg = String::new();
@@ -654,6 +654,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
+            println!("result: {:?}", result);
             let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
             let mut tags = Vec::new();
             tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));

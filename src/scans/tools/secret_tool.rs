@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use serde_json::{Value, json};
 
@@ -51,27 +51,29 @@ impl SecretTool {
             _path = format!("/tmp/code");
         }
 
-        // let cmd = "trufflehog";
-        // let out = execute_command(cmd, true).await;
-        // if out == "" {
-        //     print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
-        // }
-
-        let remove_git_folder = format!("rm -rf {}/.git", _path);
-        execute_command(&remove_git_folder, true).await;
-        
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
         excluded_folders.push("dist");
-
-        for folder in excluded_folders.iter() {
-            let remove_folder = format!("rm -rf {}/{}", _path, folder);
-            execute_command(&remove_folder, true).await;
-        }
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
         
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,ALIBABA", _path);
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
+
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,ALIBABA,YELP,FLATIO", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
