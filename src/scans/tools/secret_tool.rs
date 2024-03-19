@@ -58,6 +58,7 @@ impl SecretTool {
         excluded_folders.push("dist");
         excluded_folders.push(".github");
         excluded_folders.push("__tests__");
+        excluded_folders.push("test");
         
         // list all folders under _path recursively and then delete excluded folders
         let mut folders = fs::read_dir(_path.clone()).unwrap();
