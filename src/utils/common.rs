@@ -1,4 +1,8 @@
+use std::fs::File;
+use std::io::Read;
+use std::time::Duration;
 use std::{collections::HashMap, process::Command};
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
 use regex::Regex;
 use mongodb::{options::ClientOptions, Client};
@@ -21,6 +25,41 @@ fn hash_text(input: &str) -> String {
     hasher.update(input.as_bytes());
     let hashed_string = format!("{:x}", hasher.finalize());
     hashed_string
+}
+
+pub async fn upload_to_defect_dojo(is_new_import: bool, token: &str, url: &str, product_name: &str, engagement_name: &str, filename: &str) -> Result<(), reqwest::Error> {
+    let mut file = File::open(filename.clone()).unwrap();
+
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+
+    let client = reqwest::Client::builder()
+        // Increase timeout to allow more time for server response
+        .timeout(Duration::from_secs(300)) 
+        .pool_max_idle_per_host(0)
+        .build()?;
+    let product_name = product_name.to_string();
+    let engagement_name = engagement_name.to_string();
+    let form = reqwest::multipart::Form::new()
+        .part("file", reqwest::multipart::Part::bytes(buffer).file_name(filename.to_string()))
+        .part("scan_type", reqwest::multipart::Part::text("SARIF"))
+        .part("product_name", reqwest::multipart::Part::text(product_name))
+        .part("engagement_name", reqwest::multipart::Part::text(engagement_name));
+    let endpoint = if is_new_import { "/api/v2/import-scan/" } else { "/api/v2/reimport-scan/" };
+    let request = client.post(url.to_string() + endpoint)
+        .multipart(form)
+        .header("Authorization", format!("Token {}", token));
+
+    let response = request.send().await?;
+    // print response
+    if !response.status().is_success() {
+        println!("Post failed: {}", response.text().await?);
+        std::process::exit(1);
+    }
+
+
+    println!("{:?}", response.text().await?);
+    Ok(())
 }
 
 pub async fn slack_alert(url: &str, message: &str, mongo_uri: &str) {

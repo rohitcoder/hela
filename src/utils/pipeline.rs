@@ -2,9 +2,9 @@ use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
 use serde_json::{json, Value};
 
-use crate::utils::common::slack_alert;
+use crate::utils::common::{slack_alert, upload_to_defect_dojo};
 
-use super::common::{self, execute_command, print_error, redact_github_token};
+use super::common::{self, execute_command, print_error, redact_github_token };
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String) {
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
@@ -654,7 +654,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
-            println!("result: {:?}", result);
             let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
             let mut tags = Vec::new();
             tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
@@ -668,6 +667,10 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     run.insert("results".to_owned(), serde_json::Value::Array(results));
     sarif_report.insert("runs", serde_json::Value::Array(vec![serde_json::Value::Object(run)]));
     std::fs::write("/tmp/sarif_report.json", serde_json::to_string_pretty(&sarif_report).unwrap()).unwrap();
+    let defectdojo_url = "https://defectdojo.growwinfra.in";
+    let defectdojo_api_key = "1f36dfd23a8b2c91a8157580933dd1359799d320";
+    let resp = upload_to_defect_dojo(true, defectdojo_api_key, defectdojo_url, "test_prod", "test_engagement", "/tmp/sarif_report.json").await;
+    println!("{:?}", resp);
     println!("[+] SARIF report generated at /tmp/sarif_report.json");
 }
 
@@ -677,7 +680,6 @@ pub async fn get_commit_info(start_line: u64, end_line: u64, path: &str) -> Valu
     let mut path = path.replace("/tmp/app/", "");
     path = path.replace("/code/", "/app/");
     let cmd = format!("cd {} && git blame -L {},{} {} --show-email -l -t -p", folder, start_line, end_line, path.clone());
-    println!("cmd: {}", cmd);
     let output = execute_command(&cmd, false).await;
 
     if output.is_empty() {
