@@ -1,14 +1,11 @@
 mod scans;
 mod utils;
-
-
-use tokio::main;
 use scans::scanner::ScanRunner;
 use utils::pipeline;
 use crate::scans::tools::{sast_tool::SastTool, sca_tool::ScaTool, secret_tool::SecretTool, license_tool::LicenseTool};
 use argparse::{ArgumentParser, StoreTrue, Store};
 
-async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, server_url: Option<&str>, no_install:bool, root_only: bool, build_args: String,  manifests: String, rule_path: String, verbose: bool) {
+async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, branch: Option<&str>, no_install:bool, root_only: bool, build_args: String,  manifests: String, rule_path: String, verbose: bool) {
     let scanner = ScanRunner::new(
         SastTool::new(),
         ScaTool::new(),
@@ -16,7 +13,7 @@ async fn execute_scan(scan_type: &str, path: &str, commit_id: Option<&str>, bran
         LicenseTool::new(),
     );
 
-    scanner.execute_scan(scan_type, path, commit_id, branch, server_url, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
+    scanner.execute_scan(scan_type, path, commit_id, branch, no_install, root_only, build_args, manifests, rule_path.clone(), verbose).await;
 }
 #[tokio::main]
 async fn main() {
@@ -31,7 +28,10 @@ async fn main() {
     let mut path = String::new();
     let mut rule_path = String::new();
     let mut commit_id = String::new();
-    let mut server_url = String::new();
+    let mut defectdojo_url = String::new();
+    let mut defectdojo_token = String::new();
+    let mut product_name = String::new();
+    let mut engagement_name = String::new();
     let mut branch = String::new();
     let mut policy_url = String::new();
     let mut build_args = String::new();
@@ -55,8 +55,14 @@ async fn main() {
             .add_option(&["-b", "--branch"], Store, "Pass the branch name to scan (Optional)");
         ap.refer(&mut is_sast)
             .add_option(&["-s", "--sast"], StoreTrue, "Run SAST scan");
-        ap.refer(&mut server_url)
-            .add_option(&["-u", "--server-url"], Store, "Pass the server URL to post scan results");
+        ap.refer(&mut defectdojo_url)
+            .add_option(&["-u", "--defectdojo-url"], Store, "Pass the defectdojo url to post scan results");
+        ap.refer(&mut defectdojo_token)
+            .add_option(&["-t", "--defectdojo-token"], Store, "Pass the defectdojo API token to post scan results");
+        ap.refer(&mut product_name)
+            .add_option(&["-x", "--product-name"], Store, "Pass the defectdojo product name to post scan results");
+        ap.refer(&mut engagement_name)
+            .add_option(&["-g", "--engagement-name"], Store, "Pass the defectdojo engagement name to post scan results");
         ap.refer(&mut is_sca)
             .add_option(&["-c", "--sca"], StoreTrue, "Run SCA scan");
         ap.refer(&mut is_secret)
@@ -89,19 +95,19 @@ async fn main() {
         println!("[+] Found DbConnection, we will be using it for filtering out the results");
     }
     if is_sast {
-        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
+        execute_scan("sast", &path, if commit_id.is_empty() { None } else { Some(&commit_id) },  if branch.is_empty() { None } else { Some(&branch) }, no_install, root_only, build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_sca {
-        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only,  build_args.clone(), manifests.clone(), rule_path.clone(), verbose).await;
+        execute_scan("sca", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, no_install, root_only,  build_args.clone(), manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_secret {
-        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) },no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
+        execute_scan("secret", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) },no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if is_license_compliance {
-        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, if server_url.is_empty() { None } else { Some(&server_url) }, no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
+        execute_scan("license-compliance", &path, if commit_id.is_empty() { None } else { Some(&commit_id) }, if branch.is_empty() { None } else { Some(&branch) }, no_install, root_only,  build_args.clone(),  manifests.clone(), rule_path.clone(), verbose).await;
     }
 
     if !is_sast && !is_sca && !is_secret && !is_license_compliance {
@@ -114,6 +120,6 @@ async fn main() {
             println!("{}", output);
         }
     }else {
-        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url, commit_id, mongo_uri).await;
+        pipeline::pipeline_failure(path.clone(), is_sast, is_sca, is_secret, is_license_compliance, policy_url, slack_url, commit_id, mongo_uri, defectdojo_url, defectdojo_token, product_name, engagement_name).await;
     }
 }

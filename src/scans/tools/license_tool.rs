@@ -14,7 +14,7 @@ impl LicenseTool {
         LicenseTool
     }
     
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, verbose: bool) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running License compliance scan on path: {}", _path);
@@ -91,23 +91,11 @@ impl LicenseTool {
                 manifest_license.insert(format!("{}/{}", folder_path, file_name), component_licenses.clone());
             }
         }
-        if _server_url.is_some() {
-            let post_link = format!("{}/license_data", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, json!(manifest_license)).await;
-
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("[+] Successfully posted SCA scan data to server!");
-                }else{
-                    println!("Error while posting SCA scan data to server!");
-                }
-            }
-        }
-            // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
-            // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
-            let mut output_json = json!({});
-            if std::path::Path::new("/tmp/output.json").exists() {
-                let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
+        // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+        // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
+        let mut output_json = json!({});
+        if std::path::Path::new("/tmp/output.json").exists() {
+            let output_json_data = std::fs::read_to_string("/tmp/output.json").unwrap();
             output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
         }
         output_json["license"] = json!(manifest_license);

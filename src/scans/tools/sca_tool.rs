@@ -146,7 +146,7 @@ impl ScaTool {
         }
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running SCA scan on path: {}", _path);
@@ -294,21 +294,6 @@ impl ScaTool {
                 let manifest_path = format!("{}/{}", folder_path, file_name);
                 let blank_vals = serde_json::from_str::<serde_json::Map<String, Value>>(format!("{{\"source\": {{\"path\": \"{}\", \"type\": \"lockfile\"}}, \"packages\": []}}", manifest_path).as_str()).unwrap();
                 mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), blank_vals);
-            }
-        }
-    
-        if _server_url.is_some() {
-            if verbose {
-                println!("[+] Posting SCA scan data to server...");
-            }
-            let post_link = format!("{}/sca", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("[+] Successfully posted SCA scan data to server!");
-                }else{
-                    println!("Error while posting SCA scan data to server!");
-                }
             }
         }
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it

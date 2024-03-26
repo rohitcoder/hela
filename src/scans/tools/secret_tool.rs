@@ -11,7 +11,7 @@ impl SecretTool {
         SecretTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, verbose: bool) {
       let start_time = Instant::now();
       if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
@@ -116,20 +116,6 @@ impl SecretTool {
         }
         let json_output = std::fs::read_to_string("/tmp/secrets.json").expect("Error reading file");
         let json_output: serde_json::Value = serde_json::from_str::<serde_json::Value>(&json_output).unwrap();
-        
-        if _server_url.is_some() {
-            println!("[+] Posting Secret scan data to server...");
-            let post_link = format!("{}/secret", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, json_output.clone()).await;
-
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("Successfully posted Secret scan data to server!");
-                }else{
-                    println!("Error while posting Secret scan data to server!");
-                }
-            }
-        }
             
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
