@@ -2,7 +2,7 @@ use std::{fs, time::Instant};
 
 use serde_json::{Value, json};
 
-use crate::utils::common::{execute_command, print_error, post_json_data, count_env_variables};
+use crate::utils::common::{execute_command, print_error, count_env_variables};
 
 pub struct SecretTool;
 
