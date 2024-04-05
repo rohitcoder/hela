@@ -51,12 +51,6 @@ pub async fn upload_to_defect_dojo(is_new_import: bool, token: &str, url: &str, 
         .header("Authorization", format!("Token {}", token));
 
     let response = request.send().await?;
-    // print response
-    if !response.status().is_success() {
-        println!("Post failed: {}", response.text().await?);
-        std::process::exit(1);
-    }
-    println!("{:?}", response.text().await?);
     Ok(())
 }
 
