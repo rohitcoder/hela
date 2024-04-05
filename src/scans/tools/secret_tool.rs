@@ -1,8 +1,8 @@
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use serde_json::{Value, json};
 
-use crate::utils::common::{execute_command, print_error, post_json_data, count_env_variables};
+use crate::utils::common::{execute_command, print_error, count_env_variables};
 
 pub struct SecretTool;
 
@@ -11,7 +11,7 @@ impl SecretTool {
         SecretTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, verbose: bool) {
       let start_time = Instant::now();
       if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
@@ -51,27 +51,30 @@ impl SecretTool {
             _path = format!("/tmp/code");
         }
 
-        // let cmd = "trufflehog";
-        // let out = execute_command(cmd, true).await;
-        // if out == "" {
-        //     print_error("Error: Secret Scanner is not configured properly, please contact support team!", 101);
-        // }
-
-        let remove_git_folder = format!("rm -rf {}/.git", _path);
-        execute_command(&remove_git_folder, true).await;
-        
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
         excluded_folders.push("dist");
-
-        for folder in excluded_folders.iter() {
-            let remove_folder = format!("rm -rf {}/{}", _path, folder);
-            execute_command(&remove_folder, true).await;
-        }
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+        excluded_folders.push("test");
         
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,ALIBABA", _path);
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
+
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
@@ -113,20 +116,6 @@ impl SecretTool {
         }
         let json_output = std::fs::read_to_string("/tmp/secrets.json").expect("Error reading file");
         let json_output: serde_json::Value = serde_json::from_str::<serde_json::Value>(&json_output).unwrap();
-        
-        if _server_url.is_some() {
-            println!("[+] Posting Secret scan data to server...");
-            let post_link = format!("{}/secret", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, json_output.clone()).await;
-
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("Successfully posted Secret scan data to server!");
-                }else{
-                    println!("Error while posting Secret scan data to server!");
-                }
-            }
-        }
             
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}

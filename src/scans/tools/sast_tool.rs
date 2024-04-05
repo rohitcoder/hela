@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use serde_json::json;
 
@@ -11,7 +11,7 @@ impl SastTool {
         SastTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, rule_path: String, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, rule_path: String, verbose: bool) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path);
@@ -36,13 +36,6 @@ impl SastTool {
                 execute_command(&copy_command, true).await;
             }
         }
-
-        let cmd = "semgrep --version";
-        let out = execute_command(cmd, false).await;
-        if out == "" {
-            print_error("Error: SAST Scanner is not configured properly, please contact support team!", 101);
-        }
-        
         
         let mut _path = format!("/tmp/app");
 
@@ -87,14 +80,29 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan...");
         }
+        
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
-        excluded_folders.push("charts");
-        excluded_folders.push("public");
         excluded_folders.push("dist");
-        excluded_folders.push(".git");
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+        excluded_folders.push("test");
+        
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
         
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
         let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
@@ -113,18 +121,6 @@ impl SastTool {
         let json_output = serde_json::from_str::<serde_json::Value>(&json_output.to_string()).unwrap();
         // pick results key from json_output
         let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
-        if _server_url.is_some() {
-            println!("Posting SAST scan data to server...");
-            let post_link = format!("{}/sast", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, serde_json::Value::Array(json_output.clone())).await;
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("Successfully posted SAST scan data to server!");
-                }else{
-                    println!("Error while posting SAST scan data to server!");
-                }
-            }
-        }
          // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
         let mut output_json = json!({});

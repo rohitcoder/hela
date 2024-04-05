@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, fs, time::Instant};
 
 use serde_json::{json, Value};
 
@@ -146,7 +146,7 @@ impl ScaTool {
         }
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, _server_url: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
+    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, no_install: bool, root_only: bool, build_args: String, manfiests: String, verbose: bool) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running SCA scan on path: {}", _path);
@@ -196,6 +196,30 @@ impl ScaTool {
             }
         }
         let mut _path = format!("/tmp/app");
+
+        let mut excluded_folders = Vec::new();
+        excluded_folders.push("node_modules");
+        excluded_folders.push("build");
+        excluded_folders.push("bundles");
+        excluded_folders.push("dist");
+        excluded_folders.push(".github");
+        excluded_folders.push("__tests__");
+        excluded_folders.push("test");
+        
+        // list all folders under _path recursively and then delete excluded folders
+        let mut folders = fs::read_dir(_path.clone()).unwrap();
+        while let Some(folder) = folders.next() {
+            let folder = folder.unwrap();
+            let folder_path = folder.path();
+            let folder_path = folder_path.to_str().unwrap();
+            println!("[+] Checking if folder: {} is excluded...", folder_path);
+            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
+                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                let delete_command = format!("rm -rf {}", folder_path);
+                execute_command(&delete_command, true).await;
+            }
+        }
+        
         if let Some(commit_id) = _commit_id {
             let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
             execute_command(&checkout_command, true).await;
@@ -270,21 +294,6 @@ impl ScaTool {
                 let manifest_path = format!("{}/{}", folder_path, file_name);
                 let blank_vals = serde_json::from_str::<serde_json::Map<String, Value>>(format!("{{\"source\": {{\"path\": \"{}\", \"type\": \"lockfile\"}}, \"packages\": []}}", manifest_path).as_str()).unwrap();
                 mainfest_sca_result.insert(format!("{}/{}", folder_path, file_name), blank_vals);
-            }
-        }
-    
-        if _server_url.is_some() {
-            if verbose {
-                println!("[+] Posting SCA scan data to server...");
-            }
-            let post_link = format!("{}/sca", _server_url.unwrap());
-            let post_data = post_json_data(&post_link, json!(mainfest_sca_result.clone())).await;
-            if verbose {
-                if post_data.get("status").unwrap() == "200 OK" {
-                    println!("[+] Successfully posted SCA scan data to server!");
-                }else{
-                    println!("Error while posting SCA scan data to server!");
-                }
             }
         }
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it

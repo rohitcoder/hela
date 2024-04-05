@@ -2,19 +2,20 @@ use std::{process::exit, collections::HashMap};
 use prettytable::{Table, row};
 use serde_json::{json, Value};
 
-use crate::utils::common::slack_alert;
+use crate::utils::common::{slack_alert, upload_to_defect_dojo};
 
-use super::common::{self, execute_command, print_error, redact_github_token};
+use super::common::{self, execute_command, print_error, redact_github_token };
 
-pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String) {
+pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String, defectdojo_url: String, defectdojo_token: String, product_name: String, engagement_name: String) {
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
+    let mut total_issues = 0;
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
     let mut found_issues = false;
     let mut found_sast_issues = false;
     let mut found_sca_issues = false;
     let mut found_secret_issues = false;
-    let mut found_license_issues = false;
+    let found_license_issues = false;
 
     let mut exit_code = 1;
     let mut exit_msg = String::new();
@@ -115,6 +116,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut sast_count = 0;
       for result in sast_results {
           sast_count += 1;
+          total_issues += 1;
           // strip message to 50 characters
           table.add_row(row![sast_count, result["path"], result["severity"], result["message"].chars().take(50).collect::<String>()]);
           slack_alert_msg.push_str(&format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]));
@@ -219,6 +221,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
             for result in vulnerabilities {
                 sca_count += 1;
+                total_issues += 1;
                 // strip summary to 50 characters
                 table.add_row(row![sca_count, format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"].chars().take(50).collect::<String>(), result["cwe_id"], result["aliases"]]);
                 slack_alert_msg.push_str(&format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]));
@@ -243,6 +246,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut detected_detectors = Vec::new();
       let mut secret_results = Vec::new();
       for result in json_output["secret"]["results"].as_array().unwrap() {
+        total_issues += 1;
         total_secrets_exposed += 1;
           let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {
               Some(line_number) => line_number,
@@ -280,6 +284,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       let mut secret_count = 0;
         for value in secret_results.clone() {
+            total_issues += 1;
             secret_count += 1;
             // strip raw to 50 characters also remove double quotes by replacing with empty string
             table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
@@ -588,6 +593,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let commiter_info = get_commit_info(result["start"]["line"].as_u64().unwrap(), result["end"]["line"].as_u64().unwrap(), result["path"].as_str().unwrap()).await;
             let mut tags = Vec::new();
             tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+            if !commit_id.is_empty() {
+                tags.push(Value::String(commit_id.to_string()));
+            }
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             sast_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             sast_results.push(serde_json::Value::Object(sast_result));
@@ -627,6 +635,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         sca_result.insert("locations".to_string(), serde_json::Value::Array(locations));
                         let mut properties = serde_json::Map::new();
                         properties.insert("severity".to_string(), serde_json::Value::String(severity.to_string()));
+                        let mut tags = Vec::new();
+                        if !commit_id.is_empty() {
+                            tags.push(Value::String(commit_id.to_string()));
+                        }
+                        properties.insert("tags".to_string(), serde_json::Value::Array(tags));
                         sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
                         sca_results.push(serde_json::Value::Object(sca_result));
                     }
@@ -657,6 +670,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
             let mut tags = Vec::new();
             tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+            if !commit_id.is_empty() {
+                tags.push(Value::String(commit_id.to_string()));
+            }
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             secret_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             secret_results.push(serde_json::Value::Object(secret_result));
@@ -668,6 +684,18 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     sarif_report.insert("runs", serde_json::Value::Array(vec![serde_json::Value::Object(run)]));
     std::fs::write("/tmp/sarif_report.json", serde_json::to_string_pretty(&sarif_report).unwrap()).unwrap();
     println!("[+] SARIF report generated at /tmp/sarif_report.json");
+
+    if !defectdojo_token.is_empty() && !defectdojo_url.is_empty() && !product_name.is_empty() && !engagement_name.is_empty() && total_issues > 0 {
+        println!("[+] Uploading SARIF report to Defect Dojo with {} issues", total_issues);
+        let resp = upload_to_defect_dojo(true, &defectdojo_token, &defectdojo_url, &product_name, &engagement_name, "/tmp/sarif_report.json").await;
+        if resp.is_ok() {
+            println!("[+] Successfully uploaded SARIF report to Defect Dojo");
+        }else{
+            println!("[+] Failed to upload SARIF report to Defect Dojo");
+        }
+    }else{
+        println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo_token, defectdojo_url, product_name, engagement_name");
+    }
 }
 
 
@@ -676,7 +704,6 @@ pub async fn get_commit_info(start_line: u64, end_line: u64, path: &str) -> Valu
     let mut path = path.replace("/tmp/app/", "");
     path = path.replace("/code/", "/app/");
     let cmd = format!("cd {} && git blame -L {},{} {} --show-email -l -t -p", folder, start_line, end_line, path.clone());
-    println!("cmd: {}", cmd);
     let output = execute_command(&cmd, false).await;
 
     if output.is_empty() {

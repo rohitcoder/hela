@@ -1,4 +1,8 @@
+use std::fs::File;
+use std::io::Read;
+use std::time::Duration;
 use std::{collections::HashMap, process::Command};
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
 use regex::Regex;
 use mongodb::{options::ClientOptions, Client};
@@ -23,6 +27,39 @@ fn hash_text(input: &str) -> String {
     hashed_string
 }
 
+pub async fn upload_to_defect_dojo(is_new_import: bool, token: &str, url: &str, product_name: &str, engagement_name: &str, filename: &str) -> Result<(), reqwest::Error> {
+    let mut file = File::open(filename.clone()).unwrap();
+
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+
+    let client = reqwest::Client::builder()
+        // Increase timeout to allow more time for server response
+        .timeout(Duration::from_secs(300)) 
+        .pool_max_idle_per_host(0)
+        .build()?;
+    let product_name = product_name.to_string();
+    let engagement_name = engagement_name.to_string();
+    let form = reqwest::multipart::Form::new()
+        .part("file", reqwest::multipart::Part::bytes(buffer).file_name(filename.to_string()))
+        .part("scan_type", reqwest::multipart::Part::text("SARIF"))
+        .part("product_name", reqwest::multipart::Part::text(product_name))
+        .part("engagement_name", reqwest::multipart::Part::text(engagement_name));
+    let endpoint = if is_new_import { "/api/v2/import-scan/" } else { "/api/v2/reimport-scan/" };
+    let request = client.post(url.to_string() + endpoint)
+        .multipart(form)
+        .header("Authorization", format!("Token {}", token));
+
+    let response = request.send().await?;
+    // print response
+    if !response.status().is_success() {
+        println!("Post failed: {}", response.text().await?);
+        std::process::exit(1);
+    }
+    println!("{:?}", response.text().await?);
+    Ok(())
+}
+
 pub async fn slack_alert(url: &str, message: &str, mongo_uri: &str) {
     let mut payload = HashMap::new();
     payload.insert("text".to_string(), message.to_string());
@@ -32,30 +69,42 @@ pub async fn slack_alert(url: &str, message: &str, mongo_uri: &str) {
         let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
         return;
     }
+    if check_hash_exists(&hashed_message, mongo_uri).await {
+        println!("[❕] Slack Alert already sent for this message");
+        return;
+    }else{
+        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+        println!("[+] Slack Alert sent successfully");
+    }
+}
+
+pub async fn check_hash_exists(message: &str, mongo_uri: &str) -> bool {
+    let hashed_message = hash_text(message);
     match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
         Ok(client) => {
             match find_message_in_hashes(&client, &hashed_message).await {
                 Ok(result) => {
                     if result.is_none() {
-                        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
                         let collection = client.database("code-security-open-source").collection("hashes");
                         let document = doc! { "message": hashed_message };
                         collection.insert_one(document, None).await.unwrap();
+                        return false
                     }else{
-                        println!("[❕] Alert already sent for this message");
+                        return true
                     }
                 },
                 Err(e) => {
                     print_error(&format!("Error: {}", e.to_string()), 101);
+                    return false
                 }
             }
         },
         Err(e) => {
             print_error(&format!("Error: {}", e.to_string()), 101);
+            return false
         }
     }
 }
-
 pub fn print_error(error: &str, error_code: i32) {
     if error.to_lowercase().starts_with("warning") {
         println!("[❕] {}", error);
