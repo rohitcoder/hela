@@ -74,7 +74,7 @@ impl SecretTool {
             }
         }
 
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO", _path);
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO,GETRESPONSE", _path);
         let output_data = execute_command(&cmd, true).await;
         let mut results: Vec<Value> = Vec::new();
         for line in output_data.lines() {
@@ -84,7 +84,11 @@ impl SecretTool {
             if json_output["SourceMetadata"].is_null() {
                 continue;
             }
-
+            // if file path contains ".git/config" 
+            if json_output["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap().contains(".git/config") {
+                println!("[+] Skipping .git/config file...");
+                continue;
+            }
             // if "Raw" is in json_output and not null then check if it contains environment variables
             if json_output["Raw"].is_string() && !json_output["Raw"].is_null() {
                 if count_env_variables(&json_output["Raw"].as_str().unwrap()) > 0 {

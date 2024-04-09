@@ -19,7 +19,7 @@ pub const SAST_FAILED_MSG: &str = "SAST failed";
 pub const EXIT_CODE_SECRET_FAILED: i32 = 104;
 pub const SECRET_FAILED_MSG: &str = "Secret scan failed";
 
-fn hash_text(input: &str) -> String {
+pub fn hash_text(input: &str) -> String {
     // Create a SHA-256 hasher.
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
@@ -50,32 +50,16 @@ pub async fn upload_to_defect_dojo(is_new_import: bool, token: &str, url: &str, 
         .multipart(form)
         .header("Authorization", format!("Token {}", token));
 
-    let response = request.send().await?;
-    // print response
-    if !response.status().is_success() {
-        println!("Post failed: {}", response.text().await?);
-        std::process::exit(1);
-    }
-    println!("{:?}", response.text().await?);
+    request.send().await?;
     Ok(())
 }
 
-pub async fn slack_alert(url: &str, message: &str, mongo_uri: &str) {
+pub async fn slack_alert(url: &str, message: &str) {
     let mut payload = HashMap::new();
     payload.insert("text".to_string(), message.to_string());
     // if document found print, there is already one hash, otherwise post_json_data
-    let hashed_message = hash_text(message);
-    if mongo_uri == "" {
-        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
-        return;
-    }
-    if check_hash_exists(&hashed_message, mongo_uri).await {
-        println!("[❕] Slack Alert already sent for this message");
-        return;
-    }else{
-        let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
-        println!("[+] Slack Alert sent successfully");
-    }
+    let _ = post_json_data(url, serde_json::to_value(payload).unwrap()).await;
+    return;
 }
 
 pub async fn check_hash_exists(message: &str, mongo_uri: &str) -> bool {
@@ -85,11 +69,11 @@ pub async fn check_hash_exists(message: &str, mongo_uri: &str) -> bool {
             match find_message_in_hashes(&client, &hashed_message).await {
                 Ok(result) => {
                     if result.is_none() {
-                        let collection = client.database("code-security-open-source").collection("hashes");
-                        let document = doc! { "message": hashed_message };
-                        collection.insert_one(document, None).await.unwrap();
+                        println!("[+] Hash not found in database, adding it...");
+                        register_hash(&message, mongo_uri).await;
                         return false
                     }else{
+                        println!("[+] Hash found in database, skipping...");
                         return true
                     }
                 },
@@ -102,6 +86,20 @@ pub async fn check_hash_exists(message: &str, mongo_uri: &str) -> bool {
         Err(e) => {
             print_error(&format!("Error: {}", e.to_string()), 101);
             return false
+        }
+    }
+}
+
+pub async fn register_hash(message: &str, mongo_uri: &str) {
+    let hashed_message = hash_text(message);
+    match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
+        Ok(client) => {
+            let collection = client.database("code-security-open-source").collection("hashes");
+            let document = doc! { "message": hashed_message };
+            collection.insert_one(document, None).await.unwrap();
+        },
+        Err(e) => {
+            print_error(&format!("Error: {}", e.to_string()), 101);
         }
     }
 }

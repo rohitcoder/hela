@@ -115,11 +115,16 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       table.add_row(row![bFg->"S.No", bFg->"Path", bFg->"Severity", bFg->"Message"]);
       let mut sast_count = 0;
       for result in sast_results {
+        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]);
+        let hashed_message = common::hash_text(vuln_record);
+        let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
+        if !is_hashed_message_exists {
           sast_count += 1;
           total_issues += 1;
           // strip message to 50 characters
           table.add_row(row![sast_count, result["path"], result["severity"], result["message"].chars().take(50).collect::<String>()]);
-          slack_alert_msg.push_str(&format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]));
+          slack_alert_msg.push_str(vuln_record);
+        }
       }
       table.printstd();
       pipeline_sast_sca_data.insert("sast", pipeline_sast_data.clone());
@@ -220,11 +225,16 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sca_count = 0;
 
             for result in vulnerabilities {
-                sca_count += 1;
-                total_issues += 1;
-                // strip summary to 50 characters
-                table.add_row(row![sca_count, format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"].chars().take(50).collect::<String>(), result["cwe_id"], result["aliases"]]);
-                slack_alert_msg.push_str(&format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]));
+                let vuln_record = &format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]);
+                let hashed_message = common::hash_text(vuln_record);
+                let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
+                if !is_hashed_message_exists {
+                    sca_count += 1;
+                    total_issues += 1;
+                    // strip summary to 50 characters
+                    table.add_row(row![sca_count, format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"].chars().take(50).collect::<String>(), result["cwe_id"], result["aliases"]]);
+                    slack_alert_msg.push_str(vuln_record);
+                }
             }
             table.printstd();
             }
@@ -284,11 +294,17 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       let mut secret_count = 0;
         for value in secret_results.clone() {
-            total_issues += 1;
-            secret_count += 1;
-            // strip raw to 50 characters also remove double quotes by replacing with empty string
-            table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
-            slack_alert_msg.push_str(&format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]));
+            let vuln_record = &format!("\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}", value["file"], value["line"], value["raw"], value["detector_name"]);
+            let hashed_message = common::hash_text(vuln_record);
+            let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
+            if !is_hashed_message_exists {
+                total_issues += 1;
+                secret_count += 1;
+                // strip raw to 50 characters also remove double quotes by replacing with empty string
+                table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
+                slack_alert_msg.push_str(vuln_record);
+            }
+            
         }
         if secret_results.len() > 0 {
             table.printstd();
@@ -538,7 +554,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             if found_issues {
                 slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-                slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
+                slack_alert(&slack_url, &slack_alert_msg).await;
             }
             // finish everything and smoothly exit
             exit(exit_code);
@@ -547,7 +563,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\t\t ================== ✅ Pipeline Passed ==================");
             if found_issues {
                 slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-                slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
+                slack_alert(&slack_url, &slack_alert_msg).await;
             }
             println!("\n\n");
         }
@@ -556,7 +572,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         println!("\t\t ================== ✅ Pipeline Passed ==================");
         if found_issues {
             slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg, &mogno_uri).await;
+            slack_alert(&slack_url, &slack_alert_msg).await;
         }
         println!("\n\n");
     }
