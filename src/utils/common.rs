@@ -50,7 +50,7 @@ pub async fn upload_to_defect_dojo(is_new_import: bool, token: &str, url: &str, 
         .multipart(form)
         .header("Authorization", format!("Token {}", token));
 
-    let response = request.send().await?;
+    request.send().await?;
     Ok(())
 }
 
