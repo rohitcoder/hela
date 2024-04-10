@@ -272,7 +272,7 @@ impl ScaTool {
             }
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
-            let sca_command = format!("cd {} && osv-scanner --format json -L {}", folder_path, file_name);
+            let sca_command = format!("cd {} && osv-scanner scan --format json -L {}", folder_path, file_name);
             let sca_output = execute_command(&sca_command, true).await;
             let json_output = match serde_json::from_str::<serde_json::Value>(&sca_output) {
                 Ok(json_output) => json_output,
