@@ -554,7 +554,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             if found_issues {
                 slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                if total_issues > 0 {
+                    slack_alert(&slack_url, &slack_alert_msg).await;
+                }else{
+                    println!("[+] No issues found in scan results, so slack alert is not sent");
+                }
             }
             // finish everything and smoothly exit
             exit(exit_code);
@@ -563,7 +567,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\t\t ================== ✅ Pipeline Passed ==================");
             if found_issues {
                 slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                if total_issues > 0 {
+                    slack_alert(&slack_url, &slack_alert_msg).await;
+                }else{
+                    println!("[+] No issues found in scan results, so slack alert is not sent");
+                }
             }
             println!("\n\n");
         }
@@ -572,7 +580,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         println!("\t\t ================== ✅ Pipeline Passed ==================");
         if found_issues {
             slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if total_issues > 0 {
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }else{
+                println!("[+] No issues found in scan results, so slack alert is not sent");
+            }
         }
         println!("\n\n");
     }
@@ -704,13 +716,14 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if !defectdojo_token.is_empty() && !defectdojo_url.is_empty() && !product_name.is_empty() && !engagement_name.is_empty() && total_issues > 0 {
         println!("[+] Uploading SARIF report to Defect Dojo with {} issues", total_issues);
         let resp = upload_to_defect_dojo(true, &defectdojo_token, &defectdojo_url, &product_name, &engagement_name, "/tmp/sarif_report.json").await;
+        println!("Response text : {:?}", resp);
         if resp.is_ok() {
             println!("[+] Successfully uploaded SARIF report to Defect Dojo");
         }else{
             println!("[+] Failed to upload SARIF report to Defect Dojo");
         }
     }else{
-        println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo_token, defectdojo_url, product_name, engagement_name");
+        println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo-token, defectdojo-url, product-name, engagement-name");
     }
 }
 
