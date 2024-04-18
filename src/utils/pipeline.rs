@@ -103,7 +103,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut table = Table::new();
 
       if sast_results.len() > 0 {
-        found_sast_issues = true;
         println!("\n\n");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str(format!("{}", commit_pr_msg).as_str());
@@ -119,6 +118,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         let hashed_message = common::hash_text(vuln_record);
         let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
         if !is_hashed_message_exists {
+          found_sast_issues = true;
           sast_count += 1;
           total_issues += 1;
           // strip message to 50 characters
@@ -215,7 +215,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             }
         }
             if vulnerabilities.len() > 0 {
-                found_sca_issues = true;
                 println!("\n\n");
                 println!("\t\t ================== SCA Results for {} ==================", manifest_file);
                 slack_alert_msg.push_str(&format!("\n\n\t\t ================== SCA Results for {} ==================", manifest_file));
@@ -229,6 +228,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                 let hashed_message = common::hash_text(vuln_record);
                 let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
                 if !is_hashed_message_exists {
+                    found_sca_issues = true;
                     sca_count += 1;
                     total_issues += 1;
                     // strip summary to 50 characters
@@ -256,8 +256,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut detected_detectors = Vec::new();
       let mut secret_results = Vec::new();
       for result in json_output["secret"]["results"].as_array().unwrap() {
-        total_issues += 1;
-        total_secrets_exposed += 1;
           let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {
               Some(line_number) => line_number,
               None => 0,
@@ -284,7 +282,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       let mut table = Table::new();
       if secret_results.clone().len() > 0 {
-        found_secret_issues = true;
         println!("\n\n");
         println!("\t\t ================== Secret Results ==================");
         slack_alert_msg.push_str("\n\n");
@@ -300,6 +297,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             if !is_hashed_message_exists {
                 total_issues += 1;
                 secret_count += 1;
+                found_secret_issues = true;
+                total_secrets_exposed += 1;
                 // strip raw to 50 characters also remove double quotes by replacing with empty string
                 table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
                 slack_alert_msg.push_str(vuln_record);
