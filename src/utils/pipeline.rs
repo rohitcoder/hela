@@ -20,6 +20,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let mut exit_code = 1;
     let mut exit_msg = String::new();
 
+    let excluded_folders = vec!["node_modules", "build", "bundles", "dist", ".github", "__tests__"];
+
     if !std::path::Path::new("/tmp/output.json").exists() {
         return;
     }
@@ -114,6 +116,18 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       table.add_row(row![bFg->"S.No", bFg->"Path", bFg->"Severity", bFg->"Message"]);
       let mut sast_count = 0;
       for result in sast_results {
+        // if result["path"] contains any of the excluded folders then skip it
+        let mut is_excluded = false;
+        for folder in excluded_folders.iter() {
+          if result["path"].contains(folder) {
+            is_excluded = true;
+            break;
+          }
+        }
+        if is_excluded {
+          println!("[+] Skipping excluded folder/file: {}", result["path"]);
+          continue;
+        }
         let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]);
         let hashed_message = common::hash_text(vuln_record);
         let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
@@ -610,7 +624,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut location = serde_json::Map::new();
             let mut physical_location = serde_json::Map::new();
             let mut artifact_location = serde_json::Map::new();
-            artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", result["path"].as_str().unwrap())));
+            let vuln_path = serde_json::Value::String(format!("file://{}", result["path"].as_str().unwrap()));
+            // check if vuln path contains
+            artifact_location.insert("uri".to_string(), vuln_path);
             physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
             location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
             locations.push(serde_json::Value::Object(location));
