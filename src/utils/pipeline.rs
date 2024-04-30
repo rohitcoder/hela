@@ -639,6 +639,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             if !commit_id.is_empty() {
                 tags.push(Value::String(commit_id.to_string()));
             }
+            tags.push(Value::String("SAST".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             sast_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             sast_results.push(serde_json::Value::Object(sast_result));
@@ -682,6 +683,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         if !commit_id.is_empty() {
                             tags.push(Value::String(commit_id.to_string()));
                         }
+                        tags.push(Value::String("SCA".to_string()));
                         properties.insert("tags".to_string(), serde_json::Value::Array(tags));
                         sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
                         sca_results.push(serde_json::Value::Object(sca_result));
@@ -716,6 +718,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             if !commit_id.is_empty() {
                 tags.push(Value::String(commit_id.to_string()));
             }
+            tags.push(Value::String("SECRET".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             secret_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             secret_results.push(serde_json::Value::Object(secret_result));
