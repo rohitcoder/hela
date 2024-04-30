@@ -20,7 +20,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let mut exit_code = 1;
     let mut exit_msg = String::new();
 
-    let excluded_folders = vec!["node_modules", "build", "bundles", "dist", ".github", "__tests__"];
+    let excluded_folders = vec!["node_modules", "build", "bundles", "charting_library", "dist", ".github", "__tests__"];
 
     if !std::path::Path::new("/tmp/output.json").exists() {
         return;
