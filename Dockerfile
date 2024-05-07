@@ -27,9 +27,9 @@ RUN npm install n -g
 RUN n stable
 
 ## Install go using wget and then set the path
-RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz && \
-    rm go1.21.5.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.21.9.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.21.9.linux-amd64.tar.gz && \
+    rm go1.21.9.linux-amd64.tar.gz
 
 ENV GOPATH=$HOME/go
 ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
