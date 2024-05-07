@@ -720,11 +720,13 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
-            let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
             let mut tags = Vec::new();
-            tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
-            if !commit_id.is_empty() {
-                tags.push(Value::String(commit_id.to_string()));
+            if !result["SourceMetadata"]["Data"]["Filesystem"]["line"].is_null() {
+                let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
+                tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+                if !commit_id.is_empty() {
+                    tags.push(Value::String(commit_id.to_string()));
+                }
             }
             tags.push(Value::String("SECRET".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
