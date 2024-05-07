@@ -74,7 +74,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           sast_result.insert("check_id", result["check_id"].to_string());
           sast_result.insert("path", vuln_path);
           sast_result.insert("severity", result["extra"]["severity"].to_string());
-          sast_result.insert("message", result["extra"]["message"].to_string());
+          let mut message = result["extra"]["message"].to_string();
+          message = format!("{}\n\nCommit: {}", message, commit_pr_msg);
+          sast_result.insert("message", message);
           sast_result.insert("lines", result["extra"]["lines"].to_string());
           
           if result["extra"]["severity"].as_str().unwrap().to_lowercase() == "warning" {
@@ -618,7 +620,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sast_result = serde_json::Map::new();
             sast_result.insert("ruleId".to_string(), serde_json::Value::String(result["check_id"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            message.insert("text".to_string(), serde_json::Value::String(result["extra"]["message"].as_str().unwrap().to_string()));
+            let msg = format!("{}\n\nCommit: {}", result["extra"]["message"].as_str().unwrap().to_string(), commit_pr_msg);
+            let msg_val = serde_json::Value::String(msg);
+            message.insert("text".to_string(), msg_val);
             sast_result.insert("message".to_string(), serde_json::Value::Object(message));
             let mut locations = Vec::new();
             let mut location = serde_json::Map::new();
@@ -666,7 +670,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         let mut sca_result = serde_json::Map::new();
                         sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
                         let mut message = serde_json::Map::new();
-                        message.insert("text".to_string(), serde_json::Value::String(summary.to_string()));
+                        let msg = format!("{}\n\nCommit: {}", summary, commit_pr_msg);
+                        let msg_val = serde_json::Value::String(msg);
+                        message.insert("text".to_string(), msg_val);
                         sca_result.insert("message".to_string(), serde_json::Value::Object(message));
                         let mut locations = Vec::new();
                         let mut location = serde_json::Map::new();
@@ -699,7 +705,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut secret_result = serde_json::Map::new();
             secret_result.insert("ruleId".to_string(), serde_json::Value::String(result["DetectorName"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            message.insert("text".to_string(), serde_json::Value::String(format!("Secret of {} with value {} exposed", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap())));
+            let msg = format!("Secret of {} with value {} exposed\n\nCommit: {}", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap(), commit_pr_msg);
+            let msg_val = serde_json::Value::String(msg);
+            message.insert("text".to_string(), msg_val);
             secret_result.insert("message".to_string(), serde_json::Value::Object(message));
             let mut locations = Vec::new();
             let mut location = serde_json::Map::new();
