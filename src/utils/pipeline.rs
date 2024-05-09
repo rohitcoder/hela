@@ -706,7 +706,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut secret_result = serde_json::Map::new();
             secret_result.insert("ruleId".to_string(), serde_json::Value::String(result["DetectorName"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            let msg = format!("Secret of {} with value {} exposed\n\nCommit: {}", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap(), commit_pr_msg);
+            let msg = format!("Secret of {} with value {} exposed\n\nCommit: {}", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap(), commit_path);
             let msg_val = serde_json::Value::String(msg);
             message.insert("text".to_string(), msg_val);
             secret_result.insert("message".to_string(), serde_json::Value::Object(message));
