@@ -40,7 +40,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if code_path.contains("@") {
         cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
     }
-    let commit_path = String();
+    let mut commit_path = String::new();
     if !commit_id.is_empty() {
         commit_path = format!("{}/commit/{}", cleaned_code_path.clone(), commit_id);
         slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
@@ -110,7 +110,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       if sast_results.len() > 0 {
         println!("\n\n");
         slack_alert_msg.push_str("\n\n");
-        slack_alert_msg.push_str(format!("{}", commit_pr_msg).as_str());
         println!("\t\t ================== SAST Results ==================");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str("\t\t ================== SAST Results ==================");
