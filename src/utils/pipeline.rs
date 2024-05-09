@@ -7,6 +7,8 @@ use crate::utils::common::{slack_alert, upload_to_defect_dojo};
 use super::common::{self, execute_command, print_error, redact_github_token };
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String, defectdojo_url: String, defectdojo_token: String, product_name: String, engagement_name: String) {
+    // if code_path contains ghp_* thend redact that value because its token
+    let redacted_code_path = redact_github_token(&code_path);
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut total_issues = 0;
     let mut pipeline_sast_sca_data = HashMap::new();
@@ -31,17 +33,16 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // start preparing results here
     let mut sast_results = Vec::new();
     let mut slack_alert_msg = String::new();
-    // if code_path contains ghp_* thend redact that value because its token
-    let redacted_code_path = redact_github_token(&code_path);
+    
 
     slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path.replace("*", "").replace("@", "")).as_str());
     let mut cleaned_code_path = code_path.clone();
     if code_path.contains("@") {
         cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
     }
-    let commit_pr_msg = String::new();
+    let commit_path = String();
     if !commit_id.is_empty() {
-        let commit_path = format!("{}/commit/{}", cleaned_code_path, commit_id);
+        commit_path = format!("{}/commit/{}", cleaned_code_path.clone(), commit_id);
         slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
     }
     
@@ -75,7 +76,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           sast_result.insert("path", vuln_path);
           sast_result.insert("severity", result["extra"]["severity"].to_string());
           let mut message = result["extra"]["message"].to_string();
-          message = format!("{}\n\nCommit: {}", message, commit_pr_msg);
+          message = format!("{}\n\nCommit: {}", message, commit_path);
           sast_result.insert("message", message);
           sast_result.insert("lines", result["extra"]["lines"].to_string());
           
@@ -620,7 +621,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sast_result = serde_json::Map::new();
             sast_result.insert("ruleId".to_string(), serde_json::Value::String(result["check_id"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            let msg = format!("{}\n\nCommit: {}", result["extra"]["message"].as_str().unwrap().to_string(), commit_pr_msg);
+            let msg = format!("{}\n\nCommit: {}", result["extra"]["message"].as_str().unwrap().to_string(), commit_path);
             let msg_val = serde_json::Value::String(msg);
             message.insert("text".to_string(), msg_val);
             sast_result.insert("message".to_string(), serde_json::Value::Object(message));
@@ -670,7 +671,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         let mut sca_result = serde_json::Map::new();
                         sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
                         let mut message = serde_json::Map::new();
-                        let msg = format!("{}\n\nCommit: {}", summary, commit_pr_msg);
+                        let msg = format!("{}\n\nCommit: {}", summary, commit_path);
                         let msg_val = serde_json::Value::String(msg);
                         message.insert("text".to_string(), msg_val);
                         sca_result.insert("message".to_string(), serde_json::Value::Object(message));
