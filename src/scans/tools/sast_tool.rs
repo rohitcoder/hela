@@ -103,6 +103,14 @@ impl SastTool {
                 let delete_command = format!("rm -rf {}", folder_path);
                 execute_command(&delete_command, true).await;
             }
+            // or if file_name contains any of exclude folders
+            for exclude_folder in excluded_folders.iter() {
+                if folder.file_name().to_str().unwrap().contains(exclude_folder) {
+                    println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
+                    let delete_command = format!("rm -rf {}", folder_path);
+                    execute_command(&delete_command, true).await;
+                }
+            }
         }
         
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
