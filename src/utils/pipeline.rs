@@ -130,7 +130,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           println!("[+] Skipping excluded folder/file: {}", result["path"]);
           continue;
         }
-        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]);
+        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}", result["path"], result["severity"]);
         let hashed_message = common::hash_text(vuln_record);
         let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
         if !is_hashed_message_exists {
