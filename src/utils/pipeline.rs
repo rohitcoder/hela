@@ -130,7 +130,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           println!("[+] Skipping excluded folder/file: {}", result["path"]);
           continue;
         }
-        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}", result["path"], result["severity"]);
+        let message_without_commit = result["message"].clone().to_string().split("\n\nCommit:").collect::<Vec<&str>>()[0].to_string();
+        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], message_without_commit);
         let hashed_message = common::hash_text(vuln_record);
         let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
         if !is_hashed_message_exists {
@@ -240,7 +241,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sca_count = 0;
 
             for result in vulnerabilities {
-                let vuln_record = &format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]);
+                let summary_without_commit = result["summary"].clone().to_string().split("\n\nCommit:").collect::<Vec<&str>>()[0].to_string();
+                let vuln_record = &format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], summary_without_commit, result["cwe_id"], result["aliases"]);
                 let hashed_message = common::hash_text(vuln_record);
                 let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
                 if !is_hashed_message_exists {
