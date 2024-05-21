@@ -14,7 +14,7 @@ impl SastTool {
     pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, rule_path: String, verbose: bool) {
         let start_time = Instant::now();
         if verbose {
-            println!("[+] Running SAST scan on path: {}", _path);
+            println!("[+] Running SAST scan on path: {}", _path.clone());
         }
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
@@ -22,17 +22,17 @@ impl SastTool {
                     println!("[+] Cloning git repo...");
                 }
                 if let Some(_branch) = _branch {
-                    let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
+                    let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path.clone());
                     execute_command(&clone_command, true).await;
                 }else{
-                    let clone_command = format!("git clone {} /tmp/app", _path);
+                    let clone_command = format!("git clone {} /tmp/app", _path.clone());
                     execute_command(&clone_command, true).await;
                 }
             }else{
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
-                let copy_command = format!("cp -r {} /tmp/app", _path);
+                let copy_command = format!("cp -r {} /tmp/app", _path.clone());
                 execute_command(&copy_command, true).await;
             }
         }
@@ -44,7 +44,7 @@ impl SastTool {
             if verbose {
                 println!("[+] Checking out to commit id: {}", commit_id);
             }
-            let checkout_command = format!("cd {} && git checkout {}", _path, commit_id);
+            let checkout_command = format!("cd {} && git checkout {}", _path.clone(), commit_id);
             execute_command(&checkout_command, true).await;
 
             let copy_command = format!("mkdir -p /tmp/code");
@@ -85,25 +85,38 @@ impl SastTool {
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
         excluded_folders.push("bundles");
+        excluded_folders.push("charting_library");
         excluded_folders.push("dist");
         excluded_folders.push(".github");
         excluded_folders.push("__tests__");
         excluded_folders.push("test");
         
-        // list all folders under _path recursively and then delete excluded folders
-        let mut folders = fs::read_dir(_path.clone()).unwrap();
-        while let Some(folder) = folders.next() {
-            let folder = folder.unwrap();
-            let folder_path = folder.path();
-            let folder_path = folder_path.to_str().unwrap();
-            println!("[+] Checking if folder: {} is excluded...", folder_path);
-            if excluded_folders.contains(&folder.file_name().to_str().unwrap()) {
-                println!("[+] Deleting folder: {}, as it is excluded...", folder_path);
-                let delete_command = format!("rm -rf {}", folder_path);
-                execute_command(&delete_command, true).await;
+        // Read the contents of the directory
+        let entries = fs::read_dir(_path.clone()).unwrap();
+
+        // Collect file names into a vector
+        let files_list: Vec<_> = entries
+            .filter_map(|entry| {
+                // Convert the `DirEntry` to a `PathBuf`
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let path = path.to_str().unwrap().to_string();
+                Some(path)
+            }).collect()
+        ;
+        
+        // now delete file whose name is in excluded_folders
+        for file in files_list.iter() {
+            for folder in excluded_folders.iter() {
+                if file.contains(folder) {
+                    println!("Removing folder/file: {} as it is in excluded_folders", file);
+                    let remove_command = format!("rm -rf {}", file);
+                    execute_command(&remove_command, true).await;
+                }
             }
         }
         
+        // now iterate over files and delete file whose 
         let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
         let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
         execute_command(&cmd, true).await;

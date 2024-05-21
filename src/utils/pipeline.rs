@@ -7,6 +7,8 @@ use crate::utils::common::{slack_alert, upload_to_defect_dojo};
 use super::common::{self, execute_command, print_error, redact_github_token };
 
 pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is_secret: bool, is_license_compliance: bool, policy_url: String, slack_url: String, commit_id: String, mogno_uri: String, defectdojo_url: String, defectdojo_token: String, product_name: String, engagement_name: String) {
+    // if code_path contains ghp_* thend redact that value because its token
+    let redacted_code_path = redact_github_token(&code_path);
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut total_issues = 0;
     let mut pipeline_sast_sca_data = HashMap::new();
@@ -20,6 +22,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     let mut exit_code = 1;
     let mut exit_msg = String::new();
 
+    let excluded_folders = vec!["node_modules", "build", "bundles", "charting_library", "dist", ".github", "__tests__"];
+
     if !std::path::Path::new("/tmp/output.json").exists() {
         return;
     }
@@ -29,17 +33,16 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     // start preparing results here
     let mut sast_results = Vec::new();
     let mut slack_alert_msg = String::new();
-    // if code_path contains ghp_* thend redact that value because its token
-    let redacted_code_path = redact_github_token(&code_path);
+    
 
     slack_alert_msg.push_str(format!("\n\n 🔎 Hela Security Scan Results for {}", redacted_code_path.replace("*", "").replace("@", "")).as_str());
     let mut cleaned_code_path = code_path.clone();
     if code_path.contains("@") {
         cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
     }
-    let commit_pr_msg = String::new();
+    let mut commit_path = String::new();
     if !commit_id.is_empty() {
-        let commit_path = format!("{}/commit/{}", cleaned_code_path, commit_id);
+        commit_path = format!("{}/commit/{}", cleaned_code_path.clone(), commit_id);
         slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
     }
     
@@ -72,7 +75,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
           sast_result.insert("check_id", result["check_id"].to_string());
           sast_result.insert("path", vuln_path);
           sast_result.insert("severity", result["extra"]["severity"].to_string());
-          sast_result.insert("message", result["extra"]["message"].to_string());
+          let mut message = result["extra"]["message"].to_string();
+          message = format!("{}\n\nCommit: {}", message, commit_path);
+          sast_result.insert("message", message);
           sast_result.insert("lines", result["extra"]["lines"].to_string());
           
           if result["extra"]["severity"].as_str().unwrap().to_lowercase() == "warning" {
@@ -103,10 +108,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut table = Table::new();
 
       if sast_results.len() > 0 {
-        found_sast_issues = true;
         println!("\n\n");
         slack_alert_msg.push_str("\n\n");
-        slack_alert_msg.push_str(format!("{}", commit_pr_msg).as_str());
         println!("\t\t ================== SAST Results ==================");
         slack_alert_msg.push_str("\n\n");
         slack_alert_msg.push_str("\t\t ================== SAST Results ==================");
@@ -115,10 +118,24 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       table.add_row(row![bFg->"S.No", bFg->"Path", bFg->"Severity", bFg->"Message"]);
       let mut sast_count = 0;
       for result in sast_results {
-        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], result["message"]);
+        // if result["path"] contains any of the excluded folders then skip it
+        let mut is_excluded = false;
+        for folder in excluded_folders.iter() {
+          if result["path"].contains(folder) {
+            is_excluded = true;
+            break;
+          }
+        }
+        if is_excluded {
+          println!("[+] Skipping excluded folder/file: {}", result["path"]);
+          continue;
+        }
+        let message_without_commit = result["message"].clone().to_string().split("\n\nCommit:").collect::<Vec<&str>>()[0].to_string();
+        let vuln_record = &format!("\n\nPath: {}\nSeverity: {}\nMessage: {}", result["path"], result["severity"], message_without_commit);
         let hashed_message = common::hash_text(vuln_record);
         let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
         if !is_hashed_message_exists {
+          found_sast_issues = true;
           sast_count += 1;
           total_issues += 1;
           // strip message to 50 characters
@@ -215,7 +232,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             }
         }
             if vulnerabilities.len() > 0 {
-                found_sca_issues = true;
                 println!("\n\n");
                 println!("\t\t ================== SCA Results for {} ==================", manifest_file);
                 slack_alert_msg.push_str(&format!("\n\n\t\t ================== SCA Results for {} ==================", manifest_file));
@@ -225,10 +241,12 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sca_count = 0;
 
             for result in vulnerabilities {
-                let vuln_record = &format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], result["summary"], result["cwe_id"], result["aliases"]);
+                let summary_without_commit = result["summary"].clone().to_string().split("\n\nCommit:").collect::<Vec<&str>>()[0].to_string();
+                let vuln_record = &format!("\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}", format!("{}@{}", result["package"], result["version"]), result["severity"], summary_without_commit, result["cwe_id"], result["aliases"]);
                 let hashed_message = common::hash_text(vuln_record);
                 let is_hashed_message_exists = common::check_hash_exists(&hashed_message, &mogno_uri).await;
                 if !is_hashed_message_exists {
+                    found_sca_issues = true;
                     sca_count += 1;
                     total_issues += 1;
                     // strip summary to 50 characters
@@ -256,8 +274,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
       let mut detected_detectors = Vec::new();
       let mut secret_results = Vec::new();
       for result in json_output["secret"]["results"].as_array().unwrap() {
-        total_issues += 1;
-        total_secrets_exposed += 1;
           let line_number = match result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_i64() {
               Some(line_number) => line_number,
               None => 0,
@@ -284,7 +300,6 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
 
       let mut table = Table::new();
       if secret_results.clone().len() > 0 {
-        found_secret_issues = true;
         println!("\n\n");
         println!("\t\t ================== Secret Results ==================");
         slack_alert_msg.push_str("\n\n");
@@ -300,6 +315,8 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             if !is_hashed_message_exists {
                 total_issues += 1;
                 secret_count += 1;
+                found_secret_issues = true;
+                total_secrets_exposed += 1;
                 // strip raw to 50 characters also remove double quotes by replacing with empty string
                 table.add_row(row![secret_count, value["file"].replace("\"", ""), value["line"], value["raw"].replace("\"", ""), value["detector_name"].replace("\"", "")]);
                 slack_alert_msg.push_str(vuln_record);
@@ -554,7 +571,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\n\n");
             if found_issues {
                 slack_alert_msg.push_str(&format!("\n\n================== ❌ Pipeline Failed ==================\n\t\t Reason: {}\n\n\n\t\t {}", pipeline_failure_reason, exit_msg));
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                if total_issues > 0 {
+                    slack_alert(&slack_url, &slack_alert_msg).await;
+                }else{
+                    println!("[+] No issues found in scan results, so slack alert is not sent");
+                }
             }
             // finish everything and smoothly exit
             exit(exit_code);
@@ -563,7 +584,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             println!("\t\t ================== ✅ Pipeline Passed ==================");
             if found_issues {
                 slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-                slack_alert(&slack_url, &slack_alert_msg).await;
+                if total_issues > 0 {
+                    slack_alert(&slack_url, &slack_alert_msg).await;
+                }else{
+                    println!("[+] No issues found in scan results, so slack alert is not sent");
+                }
             }
             println!("\n\n");
         }
@@ -572,7 +597,11 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
         println!("\t\t ================== ✅ Pipeline Passed ==================");
         if found_issues {
             slack_alert_msg.push_str("\n\n================== ✅ Pipeline Passed ==================");
-            slack_alert(&slack_url, &slack_alert_msg).await;
+            if total_issues > 0 {
+                slack_alert(&slack_url, &slack_alert_msg).await;
+            }else{
+                println!("[+] No issues found in scan results, so slack alert is not sent");
+            }
         }
         println!("\n\n");
     }
@@ -593,13 +622,17 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut sast_result = serde_json::Map::new();
             sast_result.insert("ruleId".to_string(), serde_json::Value::String(result["check_id"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            message.insert("text".to_string(), serde_json::Value::String(result["extra"]["message"].as_str().unwrap().to_string()));
+            let msg = format!("{}\n\nCommit: {}", result["extra"]["message"].as_str().unwrap().to_string(), commit_path);
+            let msg_val = serde_json::Value::String(msg);
+            message.insert("text".to_string(), msg_val);
             sast_result.insert("message".to_string(), serde_json::Value::Object(message));
             let mut locations = Vec::new();
             let mut location = serde_json::Map::new();
             let mut physical_location = serde_json::Map::new();
             let mut artifact_location = serde_json::Map::new();
-            artifact_location.insert("uri".to_string(), serde_json::Value::String(format!("file://{}", result["path"].as_str().unwrap())));
+            let vuln_path = serde_json::Value::String(format!("file://{}", result["path"].as_str().unwrap()));
+            // check if vuln path contains
+            artifact_location.insert("uri".to_string(), vuln_path);
             physical_location.insert("artifactLocation".to_string(), serde_json::Value::Object(artifact_location));
             location.insert("physicalLocation".to_string(), serde_json::Value::Object(physical_location));
             locations.push(serde_json::Value::Object(location));
@@ -612,6 +645,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             if !commit_id.is_empty() {
                 tags.push(Value::String(commit_id.to_string()));
             }
+            tags.push(Value::String("SAST".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             sast_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             sast_results.push(serde_json::Value::Object(sast_result));
@@ -638,7 +672,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         let mut sca_result = serde_json::Map::new();
                         sca_result.insert("ruleId".to_string(), serde_json::Value::String(vuln["id"].as_str().unwrap().to_string()));
                         let mut message = serde_json::Map::new();
-                        message.insert("text".to_string(), serde_json::Value::String(summary.to_string()));
+                        let msg = format!("{}\n\nCommit: {}", summary, commit_path);
+                        let msg_val = serde_json::Value::String(msg);
+                        message.insert("text".to_string(), msg_val);
                         sca_result.insert("message".to_string(), serde_json::Value::Object(message));
                         let mut locations = Vec::new();
                         let mut location = serde_json::Map::new();
@@ -655,6 +691,7 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
                         if !commit_id.is_empty() {
                             tags.push(Value::String(commit_id.to_string()));
                         }
+                        tags.push(Value::String("SCA".to_string()));
                         properties.insert("tags".to_string(), serde_json::Value::Array(tags));
                         sca_result.insert("properties".to_string(), serde_json::Value::Object(properties));
                         sca_results.push(serde_json::Value::Object(sca_result));
@@ -670,7 +707,9 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             let mut secret_result = serde_json::Map::new();
             secret_result.insert("ruleId".to_string(), serde_json::Value::String(result["DetectorName"].as_str().unwrap().to_string()));
             let mut message = serde_json::Map::new();
-            message.insert("text".to_string(), serde_json::Value::String(format!("Secret of {} with value {} exposed", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap())));
+            let msg = format!("Secret of {} with value {} exposed\n\nCommit: {}", result["DetectorName"].as_str().unwrap(), result["Raw"].as_str().unwrap(), commit_path);
+            let msg_val = serde_json::Value::String(msg);
+            message.insert("text".to_string(), msg_val);
             secret_result.insert("message".to_string(), serde_json::Value::Object(message));
             let mut locations = Vec::new();
             let mut location = serde_json::Map::new();
@@ -683,12 +722,15 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
             secret_result.insert("locations".to_string(), serde_json::Value::Array(locations));
             let mut properties = serde_json::Map::new();
             properties.insert("severity".to_string(), serde_json::Value::String("high".to_string()));
-            let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
             let mut tags = Vec::new();
-            tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
-            if !commit_id.is_empty() {
-                tags.push(Value::String(commit_id.to_string()));
+            if !result["SourceMetadata"]["Data"]["Filesystem"]["line"].is_null() {
+                let commiter_info = get_commit_info(result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["line"].as_u64().unwrap(), result["SourceMetadata"]["Data"]["Filesystem"]["file"].as_str().unwrap()).await;
+                tags.push(Value::String(commiter_info["email"].to_string().replace("\"", "")));
+                if !commit_id.is_empty() {
+                    tags.push(Value::String(commit_id.to_string()));
+                }
             }
+            tags.push(Value::String("SECRET".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             secret_result.insert("properties".to_string(), serde_json::Value::Object(properties));
             secret_results.push(serde_json::Value::Object(secret_result));
@@ -704,13 +746,14 @@ pub async fn pipeline_failure(code_path: String, is_sast: bool, is_sca: bool, is
     if !defectdojo_token.is_empty() && !defectdojo_url.is_empty() && !product_name.is_empty() && !engagement_name.is_empty() && total_issues > 0 {
         println!("[+] Uploading SARIF report to Defect Dojo with {} issues", total_issues);
         let resp = upload_to_defect_dojo(true, &defectdojo_token, &defectdojo_url, &product_name, &engagement_name, "/tmp/sarif_report.json").await;
+        println!("Response text : {:?}", resp);
         if resp.is_ok() {
             println!("[+] Successfully uploaded SARIF report to Defect Dojo");
         }else{
             println!("[+] Failed to upload SARIF report to Defect Dojo");
         }
     }else{
-        println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo_token, defectdojo_url, product_name, engagement_name");
+        println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo-token, defectdojo-url, product-name, engagement-name");
     }
 }
 
