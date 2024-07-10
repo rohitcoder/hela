@@ -2,7 +2,7 @@ use std::{fs, time::Instant};
 
 use serde_json::json;
 
-use crate::utils::common::{execute_command, print_error, post_json_data};
+use crate::utils::common::{checkout, execute_command, post_json_data, print_error};
 
 pub struct SastTool;
 
@@ -11,7 +11,14 @@ impl SastTool {
         SastTool
     }
 
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, rule_path: String, verbose: bool) {
+    pub async fn run_scan(
+        &self,
+        _path: &str,
+        _commit_id: Option<&str>,
+        _branch: Option<&str>,
+        rule_path: String,
+        verbose: bool,
+    ) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path.clone());
@@ -22,13 +29,26 @@ impl SastTool {
                     println!("[+] Cloning git repo...");
                 }
                 if let Some(_branch) = _branch {
-                    let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path.clone());
-                    execute_command(&clone_command, true).await;
-                }else{
-                    let clone_command = format!("git clone {} /tmp/app", _path.clone());
-                    execute_command(&clone_command, true).await;
+                    if _commit_id.is_some() {
+                        let branch = Some(_branch);
+                        let out = checkout(_path, "/tmp/app", _commit_id, branch);
+                        if out.is_err() {
+                            println!("Error while cloning: {}", out.err().unwrap());
+                        }
+                    } else {
+                        let branch = Some(_branch);
+                        let out = checkout(_path, "/tmp/app", None, branch);
+                        if out.is_err() {
+                            println!("Error while cloning: {}", out.err().unwrap());
+                        }
+                    }
+                } else {
+                    let out = checkout(_path, "/tmp/app", None, None);
+                    if out.is_err() {
+                        println!("Error while cloning: {}", out.err().unwrap());
+                    }
                 }
-            }else{
+            } else {
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
@@ -36,25 +56,8 @@ impl SastTool {
                 execute_command(&copy_command, true).await;
             }
         }
-        
+
         let mut _path = format!("/tmp/app");
-
-        // if commit_id is provided then checkout to that commit id
-        if let Some(commit_id) = _commit_id {
-            if verbose {
-                println!("[+] Checking out to commit id: {}", commit_id);
-            }
-            let checkout_command = format!("cd {} && git checkout {}", _path.clone(), commit_id);
-            execute_command(&checkout_command, true).await;
-
-            let copy_command = format!("mkdir -p /tmp/code");
-            execute_command(&copy_command, true).await;
-            let copy_command = format!("cd {} && git diff-tree --no-commit-id --name-only -r {} | xargs -I {{}} git ls-tree --name-only {} {{}} | xargs git archive --format=tar {} | tar -x -C /tmp/code", _path, commit_id, commit_id, commit_id);
-            println!("copy_command: {}", copy_command);
-            execute_command(&copy_command, true).await;
-            // now run secret scan on /tmp/code folder
-            _path = format!("/tmp/code");
-        }
         if !std::path::Path::new("/tmp/sast-rules").exists() {
             if verbose {
                 println!("[+] Downloading Rules");
@@ -63,9 +66,11 @@ impl SastTool {
                 println!("[+] Downloading Rules from {}", rule_path);
                 let clone_command = format!("git clone {} /tmp/sast-rules", rule_path);
                 execute_command(&clone_command, true).await;
-            }else {
+            } else {
                 println!("[+] Downloading Rules from default repo");
-                let clone_command = format!("git clone https://github.com/rohitcodergroww/semgrep-rules /tmp/sast-rules");
+                let clone_command = format!(
+                    "git clone https://github.com/rohitcodergroww/semgrep-rules /tmp/sast-rules"
+                );
                 execute_command(&clone_command, true).await;
             }
             // Remove .github folder from rules
@@ -80,7 +85,7 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan...");
         }
-        
+
         let mut excluded_folders = Vec::new();
         excluded_folders.push("node_modules");
         excluded_folders.push("build");
@@ -90,7 +95,7 @@ impl SastTool {
         excluded_folders.push(".github");
         excluded_folders.push("__tests__");
         excluded_folders.push("test");
-        
+
         // Read the contents of the directory
         let entries = fs::read_dir(_path.clone()).unwrap();
 
@@ -102,39 +107,60 @@ impl SastTool {
                 let path = entry.path();
                 let path = path.to_str().unwrap().to_string();
                 Some(path)
-            }).collect()
-        ;
-        
+            })
+            .collect();
+
         // now delete file whose name is in excluded_folders
         for file in files_list.iter() {
             for folder in excluded_folders.iter() {
                 if file.contains(folder) {
-                    println!("Removing folder/file: {} as it is in excluded_folders", file);
+                    println!(
+                        "Removing folder/file: {} as it is in excluded_folders",
+                        file
+                    );
                     let remove_command = format!("rm -rf {}", file);
                     execute_command(&remove_command, true).await;
                 }
             }
         }
-        
-        // now iterate over files and delete file whose 
-        let exclude_flags = excluded_folders.iter().map(|x| format!("--exclude='{}' ", x)).collect::<Vec<String>>().join(" ");
-        let cmd = format!("semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}", _path, exclude_flags);
+
+        // now iterate over files and delete file whose
+        let exclude_flags = excluded_folders
+            .iter()
+            .map(|x| format!("--exclude='{}' ", x))
+            .collect::<Vec<String>>()
+            .join(" ");
+        let cmd = format!(
+            "semgrep --config /tmp/sast-rules {} --verbose --json -o /tmp/sast_output.json {}",
+            _path, exclude_flags
+        );
         execute_command(&cmd, true).await;
         if verbose {
             println!("[+] SAST scan completed!");
         }
         // parse output and show it in terminal
         let is_file_exists = std::path::Path::new("/tmp/sast_output.json").exists();
-       
+
         if !is_file_exists {
-            print_error("Error: SAST Scanner not generated results, please contact support team!", 101);
+            print_error(
+                "Error: SAST Scanner not generated results, please contact support team!",
+                101,
+            );
         }
 
-        let json_output = std::fs::read_to_string("/tmp/sast_output.json").expect("Error reading file");
-        let json_output = serde_json::from_str::<serde_json::Value>(&json_output.to_string()).unwrap();
+        let json_output =
+            std::fs::read_to_string("/tmp/sast_output.json").expect("Error reading file");
+        let json_output =
+            serde_json::from_str::<serde_json::Value>(&json_output.to_string()).unwrap();
         // pick results key from json_output
-        let json_output = json_output.as_object().unwrap().get("results").unwrap().as_array().unwrap();
-         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
+        let json_output = json_output
+            .as_object()
+            .unwrap()
+            .get("results")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
         // output.json data will be in format {"sast":{}, "sca":{}, "secret":{}, "license":{}}
         let mut output_json = json!({});
         if std::path::Path::new("/tmp/output.json").exists() {
@@ -143,11 +169,18 @@ impl SastTool {
         }
         output_json["sast"] = serde_json::Value::Array(json_output.clone());
 
-        std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        std::fs::write(
+            "/tmp/output.json",
+            serde_json::to_string_pretty(&output_json).unwrap(),
+        )
+        .unwrap();
 
         let end_time = Instant::now();
         let elapsed_time = end_time - start_time;
         let elapsed_seconds = elapsed_time.as_secs_f64().round();
-        println!("Execution time for SAST scan: {:?} seconds", elapsed_seconds);
+        println!(
+            "Execution time for SAST scan: {:?} seconds",
+            elapsed_seconds
+        );
     }
 }
