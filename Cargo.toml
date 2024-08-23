@@ -1,0 +1,32 @@
+[package]
+name = "Hela"
+version = "0.1.4"
+edition = "2021"
+description = "This tool helps in running Static Code Analysis (SCA), Static Application Security Testing (SAST), Secret scanning, and License compliance scanning on your project. It also allows you to write your own policy files in YAML format to enforce blocking in pipelines when security issues are detected."
+license = "MIT"
+keywords = ["sca", "sast", "codesecurity", "security", "cybersecurity"]
+repository = "https://github.com/rohitcoder/hela"
+authors = ["Rohit Kumar (@rohitcoder)"]
+
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+debug = true
+
+[dependencies]
+tokio = "1.36.0"
+regex = "1.10.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.96"
+mongodb = "2.8.0"
+rand = "0.8.5"
+argparse = "0.2.2"
+reqwest = { version = "0.11", features = ["native-tls", "blocking", "rustls-tls", "json", "multipart"] }
+futures = "0.3"
+serde_yaml = "0.9"
+prettytable-rs = "0.10.0"
+bson = "2.9.0"
+sha2 = "0.9.3"
+chrono = "0.4.38"
