@@ -90,18 +90,22 @@ impl SecretTool {
             if json_output["SourceMetadata"]["Data"]["Filesystem"]["file"]
                 .as_str()
                 .unwrap()
-                .contains(".git/config")
+                .contains(".git/")
             {
-                println!("[+] Skipping .git/config file...");
+                println!("[+] Skipping .git/ file...");
                 continue;
             }
-            // if "Raw" is in json_output and not null then check if it contains environment variables
+            // Check if "Raw" is in json_output and not null
             if json_output["Raw"].is_string() && !json_output["Raw"].is_null() {
-                if count_env_variables(&json_output["Raw"].as_str().unwrap()) > 0 {
+                // Clone the string to create an owned String, extending its lifetime
+                let raw_value = json_output["Raw"].as_str().unwrap().to_string();
+
+                // Check if it contains environment variables
+                if count_env_variables(&raw_value) > 0 {
                     continue;
                 }
             }
-            results.push(json_output);
+            results.push(json_output.clone());
         }
         // ## iterate into each results and implement checks for specific DetectorName
         let mut new_results: Vec<Value> = Vec::new();
