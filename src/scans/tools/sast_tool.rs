@@ -23,6 +23,8 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path.clone());
         }
+        println!("Commit ID: {:?}", _commit_id);
+        println!("Branch: {:?}", _branch);
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 if verbose {
