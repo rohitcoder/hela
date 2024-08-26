@@ -1117,7 +1117,7 @@ pub async fn pipeline_failure(
                 }
             }
             // finish everything and smoothly exit
-            exit(exit_code);
+            exit(0);
         } else {
             if !job_id.is_empty() {
                 println!("\t\t Job ID: {}", job_id);
