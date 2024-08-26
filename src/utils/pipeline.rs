@@ -145,31 +145,49 @@ pub async fn pipeline_failure(
             HashMap::new();
 
         for result in sast_results {
-            let summary_without_commit = result["summary"]
-                .clone()
-                .to_string()
-                .split("\n\nCommit:")
-                .collect::<Vec<&str>>()[0]
-                .to_string();
+            let summary_without_commit = result
+                .get("summary")
+                .and_then(|s| Some(s.as_str()))
+                .map(|s| s.split("\n\nCommit:").collect::<Vec<&str>>()[0].to_string())
+                .unwrap_or_else(|| "No summary available".to_string());
+
+            let package_version = match (result.get("package"), result.get("version")) {
+                (Some(package), Some(version)) => format!("{}@{}", package, version),
+                _ => "Unknown package@version".to_string(),
+            };
+
+            let severity = result
+                .get("severity")
+                .cloned()
+                .unwrap_or_else(|| "Unknown severity".into());
+            let cwe_id = result
+                .get("cwe_id")
+                .cloned()
+                .unwrap_or_else(|| "Unknown CWE ID".into());
+            let aliases = result
+                .get("aliases")
+                .cloned()
+                .unwrap_or_else(|| "No aliases".into());
+
             let vuln_record = format!(
                 "\n\nPackage: {}\nSeverity: {}\nSummary: {}\nCWE ID: {}\nAliases: {}",
-                format!("{}@{}", result["package"], result["version"]),
-                result["severity"],
-                summary_without_commit,
-                result["cwe_id"],
-                result["aliases"]
+                package_version, severity, summary_without_commit, cwe_id, aliases
             );
+
             let hashed_message = common::hash_text(&vuln_record);
 
             // Collect messages and their hashes along with other details
             message_to_hash.insert(
                 hashed_message,
                 (
-                    format!("{}@{}", result["package"], result["version"]),
-                    result["severity"].clone(),
-                    result["summary"].clone(),
-                    result["cwe_id"].clone(),
-                    result["aliases"].clone(),
+                    package_version,
+                    severity,
+                    result
+                        .get("summary")
+                        .cloned()
+                        .unwrap_or_else(|| "No summary available".into()),
+                    cwe_id,
+                    aliases,
                 ),
             );
         }
