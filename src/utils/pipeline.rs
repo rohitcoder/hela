@@ -951,8 +951,10 @@ pub async fn pipeline_failure(
                     }
                 }
             }
-            exit_code = common::EXIT_CODE_SAST_FAILED;
-            exit_msg = common::SAST_FAILED_MSG.to_string();
+            if is_pipeline_failed {
+                exit_code = common::EXIT_CODE_SAST_FAILED;
+                exit_msg = common::SAST_FAILED_MSG.to_string();
+            }
         }
 
         if is_sca && sca_policy.is_some() {
@@ -999,8 +1001,10 @@ pub async fn pipeline_failure(
                     }
                 }
             }
-            exit_code = common::EXIT_CODE_SCA_FAILED;
-            exit_msg = common::SCA_FAILED_MSG.to_string();
+            if is_pipeline_failed {
+                exit_code = common::EXIT_CODE_SCA_FAILED;
+                exit_msg = common::SCA_FAILED_MSG.to_string();
+            }
         }
 
         if is_secret && secret_policy.is_some() {
@@ -1056,9 +1060,10 @@ pub async fn pipeline_failure(
                     }
                 }
             }
-
-            exit_code = common::EXIT_CODE_SECRET_FAILED;
-            exit_msg = common::SECRET_FAILED_MSG.to_string();
+            if is_pipeline_failed {
+                exit_code = common::EXIT_CODE_SECRET_FAILED;
+                exit_msg = common::SECRET_FAILED_MSG.to_string();
+            }
         }
         if is_license_compliance && license_policy.is_some() {
             let license_policy = license_policy.unwrap().as_mapping().unwrap();
@@ -1083,8 +1088,10 @@ pub async fn pipeline_failure(
                     }
                 }
             }
-            exit_code = common::EXIT_CODE_LICENSE_FAILED;
-            exit_msg = common::LICENSE_FAILED_MSG.to_string();
+            if is_pipeline_failed {
+                exit_code = common::EXIT_CODE_LICENSE_FAILED;
+                exit_msg = common::LICENSE_FAILED_MSG.to_string();
+            }
         }
         if is_pipeline_failed {
             println!("\n\n");

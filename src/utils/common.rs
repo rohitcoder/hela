@@ -197,7 +197,6 @@ pub async fn insert_job_info(
         .into_iter()
         .map(|v| to_bson(&v).unwrap_or(Bson::Null))
         .collect();
-
     // Create the document to insert
     let document = doc! {
         "job_id": job_id,
