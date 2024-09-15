@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{collections::HashMap, process::exit};
 
 use crate::utils::common::{
-    bulk_check_hash_exists, insert_job_info, slack_alert, upload_to_defect_dojo,
+    bulk_check_hash_exists, get_commit_of_file, insert_job_info, slack_alert, upload_to_defect_dojo,
 };
 
 use super::common::{self, execute_command, print_error, redact_github_token};
@@ -194,7 +194,6 @@ pub async fn pipeline_failure(
 
         let hashes: Vec<String> = message_to_hash.keys().cloned().collect();
         let existing_hashes_result = bulk_check_hash_exists(&hashes, &mongo_uri).await;
-
         // Handle the Result properly
         let existing_hashes = match existing_hashes_result {
             Ok(hashes) => hashes,
@@ -446,35 +445,29 @@ pub async fn pipeline_failure(
                 let mut secret_result = HashMap::new();
                 secret_result.insert(
                     "file",
-                    result["SourceMetadata"]["Data"]["Filesystem"]["file"].to_string(),
+                    result["SourceMetadata"]["Data"]["Filesystem"]["file"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string(),
                 );
                 secret_result.insert("line", number_string);
-                secret_result.insert("raw", result["Raw"].to_string());
+                secret_result.insert("raw", result["Raw"].as_str().unwrap_or("").to_string());
                 secret_result.insert(
                     "detector_name",
-                    result["DetectorName"].to_string().to_uppercase(),
+                    result["DetectorName"].as_str().unwrap_or("").to_uppercase(),
                 );
-                secret_result.insert("decoder_name", result["DecoderName"].to_string());
+                secret_result.insert(
+                    "decoder_name",
+                    result["DecoderName"].as_str().unwrap_or("").to_string(),
+                );
                 secret_result
             };
             secret_results.push(secret_result);
-            if !detected_detectors.contains(
-                &result["DetectorName"]
-                    .as_str()
-                    .unwrap()
-                    .to_string()
-                    .to_uppercase(),
-            ) {
-                detected_detectors.push(
-                    result["DetectorName"]
-                        .as_str()
-                        .unwrap()
-                        .to_string()
-                        .to_uppercase(),
-                );
+            let detector_name = result["DetectorName"].as_str().unwrap_or("").to_uppercase();
+            if !detected_detectors.contains(&detector_name) {
+                detected_detectors.push(detector_name);
             }
         }
-
         detected_detectors = detected_detectors
             .iter()
             .map(|x| x.to_string())
@@ -493,13 +486,18 @@ pub async fn pipeline_failure(
         }
 
         let mut secret_count = 0;
-        let mut message_to_hash: HashMap<String, (String, String, String, String)> = HashMap::new();
+        let mut message_to_hash: HashMap<String, (String, String, String, String, String)> =
+            HashMap::new();
 
         // Collect all secret records and their hashes
         for value in secret_results.clone() {
+            // Append to slack alert message, remove first 2 values after split with "/"
+            let file_commit = get_commit_of_file(&value["file"]);
+            let commit_base_link = commit_path.split("/commit").collect::<Vec<&str>>()[0];
+            let commit_link = format!("{}/commit/{}", commit_base_link, file_commit.unwrap());
             let vuln_record = format!(
-                "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}",
-                value["file"], value["line"], value["raw"], value["detector_name"]
+                "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}\nCommit: {}",
+                value["file"], value["line"], value["raw"], value["detector_name"], commit_link
             );
             let hashed_message = common::hash_text(&vuln_record);
 
@@ -507,10 +505,11 @@ pub async fn pipeline_failure(
             message_to_hash.insert(
                 hashed_message,
                 (
-                    value["file"].replace("\"", ""),
+                    value["file"].clone(),
                     value["line"].clone(),
-                    value["raw"].replace("\"", ""),
-                    value["detector_name"].replace("\"", ""),
+                    value["raw"].clone(),
+                    value["detector_name"].clone(),
+                    commit_link,
                 ),
             );
         }
@@ -529,10 +528,8 @@ pub async fn pipeline_failure(
         };
 
         let mut secret_count = 0;
-        let mut found_secret_issues = false;
-
         // Process each message to check for existence and add to the table
-        for (hashed_message, (file, line, raw, detector_name)) in message_to_hash {
+        for (hashed_message, (file, line, raw, detector_name, commit_link)) in message_to_hash {
             if !existing_hashes.contains(&hashed_message) {
                 found_secret_issues = true;
                 secret_count += 1;
@@ -545,10 +542,9 @@ pub async fn pipeline_failure(
                 // Add row to table
                 table.add_row(row![secret_count, file, line, raw_truncated, detector_name]);
 
-                // Append to slack alert message
                 slack_alert_msg.push_str(&format!(
-                    "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}",
-                    file, line, raw, detector_name
+                    "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}\nCommit: {}",
+                    file, line, raw, detector_name, commit_link
                 ));
 
                 // Register the missing hash
@@ -617,7 +613,6 @@ pub async fn pipeline_failure(
             .collect::<Vec<String>>();
         pipeline_secret_license_data.insert("licenses", licenses_list);
     }
-
     if found_sast_issues == false
         && found_sca_issues == false
         && found_secret_issues == false
@@ -1101,7 +1096,7 @@ pub async fn pipeline_failure(
                 println!("\t\t Job ID: {}", job_id);
                 if !mongo_uri.is_empty() {
                     println!("\t\t Inserting job info into MongoDB");
-                    insert_job_info(
+                    let _ = insert_job_info(
                         &mongo_uri,
                         &job_id,
                         &pipeline_failure_reason,
@@ -1130,7 +1125,7 @@ pub async fn pipeline_failure(
                 println!("\t\t Job ID: {}", job_id);
                 if !mongo_uri.is_empty() {
                     println!("\t\t Inserting job info into MongoDB");
-                    insert_job_info(
+                    let _ = insert_job_info(
                         &mongo_uri,
                         &job_id,
                         &pipeline_failure_reason,
@@ -1165,7 +1160,7 @@ pub async fn pipeline_failure(
                 println!("[+] No issues found in scan results, so slack alert is not sent");
             }
         }
-        insert_job_info(
+        let _ = insert_job_info(
             &mongo_uri,
             &job_id,
             "No policy file provided, skipping policy check",
@@ -1236,6 +1231,7 @@ pub async fn pipeline_failure(
         println!("[+] Could not upload SARIF report to Defect Dojo because of missing configuration - defectdojo-token, defectdojo-url, product-name, engagement-name");
     }
 }
+
 pub async fn get_commit_info(
     start_line: u64,
     end_line: u64,
@@ -1301,6 +1297,7 @@ pub async fn get_commit_info(
         "commit_hash": commit_hash
     })
 }
+// Function to fetch commit information from GitHub API
 // Function to fetch commit information from GitHub API
 async fn get_commit_info_from_github(path: &str, repo_url_with_pat: &str) -> Option<Value> {
     // Parse the repository URL with PAT

@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM rust:latest;ls;
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2024-02-04
 COPY Cargo.toml /hela/Cargo.toml
 COPY Cargo.lock /hela/Cargo.lock
@@ -13,7 +13,7 @@ RUN rm -rf /hela
 # Update the package list and upgrade the system
 RUN apt-get update && \
     apt-get -y upgrade
-    
+
 ## configure tzdata to avoid interactive prompt
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London

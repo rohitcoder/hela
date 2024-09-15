@@ -271,6 +271,8 @@ pub fn checkout(
     commit_ids: Option<&str>,
     branch_name: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut file_commit_map: HashMap<String, String> = HashMap::new();
+
     let commit_hashes: Vec<&str> = match commit_ids {
         Some(ref ids) if !ids.is_empty() => ids.split(',').collect(),
         _ => vec![],
@@ -315,10 +317,12 @@ pub fn checkout(
         }
     }
 
-    // if commit_ids provided only then run below logic
+    // If no commit IDs are provided, return early.
     if commit_hashes.is_empty() {
+        save_commit_map(&file_commit_map)?;
         return Ok(());
     }
+
     let mut all_files = String::new();
     for commit in commit_hashes {
         let output = Command::new("git")
@@ -337,7 +341,6 @@ pub fn checkout(
             .arg("--name-only")
             .arg(format!("{}^", commit))
             .arg(commit)
-            .stdout(Stdio::piped())
             .output()?;
 
         if !output.status.success() {
@@ -349,6 +352,11 @@ pub fn checkout(
 
         let files = String::from_utf8_lossy(&output.stdout);
         all_files.push_str(&files);
+
+        // Map each file to the current commit ID.
+        for file in files.lines() {
+            file_commit_map.insert(file.to_string(), commit.to_string());
+        }
     }
 
     println!("FILES\n______\n{}", all_files);
@@ -357,7 +365,33 @@ pub fn checkout(
 
     delete_empty_directories(&cloned_path)?;
 
+    // Save the commit map to /tmp/commit_map.json.
+    save_commit_map(&file_commit_map)?;
+
     Ok(())
+}
+
+// Function to save the commit map to /tmp/commit_map.json.
+fn save_commit_map(
+    file_commit_map: &HashMap<String, String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let commit_map_path = "/tmp/commit_map.json";
+    let file = File::create(commit_map_path)?;
+    serde_json::to_writer(file, file_commit_map)?;
+    println!("Commit map saved to: {}", commit_map_path);
+    Ok(())
+}
+
+pub fn get_commit_of_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let relative_path = file_path.split("/").collect::<Vec<&str>>()[3..]
+        .join("/")
+        .replace("\"", "");
+    let commit_map_path = "/tmp/commit_map.json";
+    let file = File::open(commit_map_path)?;
+    let file_commit_map: HashMap<String, String> = serde_json::from_reader(file)?;
+    let binding = "".to_string();
+    let commit_id = file_commit_map.get(&relative_path).unwrap_or(&binding);
+    Ok(commit_id.to_string())
 }
 
 fn delete_except(files: &str, base_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
