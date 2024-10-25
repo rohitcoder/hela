@@ -1,4 +1,5 @@
 use bson::to_bson;
+
 use futures::StreamExt;
 use mongodb::{
     bson::{doc, Bson, Document},
@@ -265,113 +266,6 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     stdout.to_string()
 }
 
-pub fn checkout(
-    clone_url: &str,
-    clone_path: &str,
-    commit_ids: Option<&str>,
-    branch_name: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file_commit_map: HashMap<String, String> = HashMap::new();
-
-    let commit_hashes: Vec<&str> = match commit_ids {
-        Some(ref ids) if !ids.is_empty() => ids.split(',').collect(),
-        _ => vec![],
-    };
-    let depth = commit_hashes.len() + 1;
-    let mut clone_cmd = Command::new("git");
-    clone_cmd
-        .arg("clone")
-        .arg("--depth")
-        .arg(depth.to_string())
-        .arg(clone_url)
-        .arg(clone_path);
-
-    if let Some(branch) = branch_name {
-        if branch != "undefined" {
-            clone_cmd.arg("--branch").arg(branch);
-        } else {
-            println!("Warning: Branch name is 'undefined'. Cloning the default branch.");
-        }
-    } else {
-        println!("No branch specified, cloning the default branch.");
-    }
-    let output = clone_cmd.output()?;
-    if !output.status.success() {
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Failed to clone repository: {}", error_msg).into());
-    }
-
-    let cloned_path = Path::new(clone_path).canonicalize()?;
-    env::set_current_dir(&cloned_path)?;
-
-    for commit in &commit_hashes {
-        let output = Command::new("git")
-            .arg("fetch")
-            .arg("origin")
-            .arg(commit)
-            .output()?;
-
-        if !output.status.success() {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to fetch commit {}: {}", commit, error_msg).into());
-        }
-    }
-
-    // If no commit IDs are provided, return early.
-    if commit_hashes.is_empty() {
-        save_commit_map(&file_commit_map)?;
-        return Ok(());
-    }
-
-    let mut all_files = String::new();
-    for commit in commit_hashes {
-        let output = Command::new("git")
-            .arg("reset")
-            .arg("--hard")
-            .arg(commit)
-            .output()?;
-
-        if !output.status.success() {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to reset to commit {}: {}", commit, error_msg).into());
-        }
-
-        let output = Command::new("git")
-            .arg("diff")
-            .arg("--name-only")
-            .arg(format!("{}^", commit))
-            .arg(commit)
-            .output()?;
-
-        if !output.status.success() {
-            let error_msg = String::from_utf8_lossy(&output.stderr);
-            return Err(
-                format!("Failed to list files for commit {}: {}", commit, error_msg).into(),
-            );
-        }
-
-        let files = String::from_utf8_lossy(&output.stdout);
-        all_files.push_str(&files);
-
-        // Map each file to the current commit ID.
-        for file in files.lines() {
-            file_commit_map.insert(file.to_string(), commit.to_string());
-        }
-    }
-
-    println!("FILES\n______\n{}", all_files);
-
-    delete_except(&all_files, &cloned_path)?;
-
-    delete_empty_directories(&cloned_path)?;
-
-    // Save the commit map to /tmp/commit_map.json.
-    save_commit_map(&file_commit_map)?;
-
-    Ok(())
-}
-
-// Function to save the commit map to /tmp/commit_map.json.
 fn save_commit_map(
     file_commit_map: &HashMap<String, String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -382,19 +276,9 @@ fn save_commit_map(
     Ok(())
 }
 
-pub fn get_commit_of_file(file_path: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let relative_path = file_path.split("/").collect::<Vec<&str>>()[3..]
-        .join("/")
-        .replace("\"", "");
-    let commit_map_path = "/tmp/commit_map.json";
-    let file = File::open(commit_map_path)?;
-    let file_commit_map: HashMap<String, String> = serde_json::from_reader(file)?;
-    let binding = "".to_string();
-    let commit_id = file_commit_map.get(&relative_path).unwrap_or(&binding);
-    Ok(commit_id.to_string())
-}
-
 fn delete_except(files: &str, base_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Deleting all files except the following:");
+    println!("__________________________________________ {:?}", files);
     let files_to_keep: Vec<PathBuf> = files
         .lines()
         .map(|line| base_dir.join(line.trim()))
@@ -447,6 +331,166 @@ fn delete_empty_directories(start_dir: &Path) -> Result<(), std::io::Error> {
     }
 
     Ok(())
+}
+
+fn get_cumulative_pr_files(
+    base_branch: Option<&str>,
+    pr_branch: Option<&str>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    if let Some(base) = base_branch {
+        // Step 1: Create and checkout a temporary branch from the base branch
+        Command::new("git").args(&["checkout", base]).output()?;
+        Command::new("git")
+            .args(&["checkout", "-b", "temp_pr_merge_branch"])
+            .output()?;
+
+        if let Some(pr) = pr_branch {
+            // Step 2: Merge the PR branch without fast-forwarding
+            let merge_output = Command::new("git")
+                .args(&["merge", "--no-ff", pr])
+                .output()?;
+            if !merge_output.status.success() {
+                let error_msg = String::from_utf8_lossy(&merge_output.stderr);
+                return Err(format!("Failed to merge PR branch: {}", error_msg).into());
+            }
+
+            // Step 3: Get the list of changed files in the cumulative diff
+            let output = Command::new("git")
+                .args(&["diff", "--name-only", base, "temp_pr_merge_branch"])
+                .output()?;
+            if !output.status.success() {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to get cumulative PR files: {}", error_msg).into());
+            }
+
+            let files = String::from_utf8_lossy(&output.stdout);
+            let file_names = files.lines().map(String::from).collect();
+
+            // Cleanup: Delete the temporary branch
+            Command::new("git").args(&["checkout", base]).output()?;
+            Command::new("git")
+                .args(&["branch", "-D", "temp_pr_merge_branch"])
+                .output()?;
+
+            Ok(file_names)
+        } else {
+            Err("PR branch is required when base branch is specified.".into())
+        }
+    } else {
+        Err("Base branch is required.".into())
+    }
+}
+
+pub fn checkout(
+    clone_url: &str,
+    clone_path: &str,
+    base_branch: Option<&str>,
+    pr_branch: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Clone the repository
+    let mut clone_cmd = Command::new("git");
+    clone_cmd.arg("clone").arg(clone_url).arg(clone_path);
+
+    if let Some(branch) = base_branch {
+        clone_cmd.arg("--branch").arg(branch);
+    }
+
+    let output = clone_cmd.output()?;
+    if !output.status.success() {
+        let error_msg = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to clone repository: {}", error_msg).into());
+    }
+
+    let cloned_path = Path::new(clone_path).canonicalize()?;
+    env::set_current_dir(&cloned_path)?;
+
+    // Get the list of changed files
+    let changed_files = match (base_branch, pr_branch) {
+        (Some(base), Some(pr)) => {
+            let fetch_output = Command::new("git")
+                .args(&["fetch", "origin", pr])
+                .output()?;
+            if !fetch_output.status.success() {
+                let error_msg = String::from_utf8_lossy(&fetch_output.stderr);
+                return Err(format!("Failed to fetch PR branch: {}", error_msg).into());
+            }
+            get_cumulative_pr_files(Some(base), Some(&format!("origin/{}", pr)))?
+        }
+        (Some(base), None) => {
+            let output = Command::new("git")
+                .args(&["ls-tree", "-r", "--name-only", base])
+                .output()?;
+            if !output.status.success() {
+                let error_msg = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to list files in base branch: {}", error_msg).into());
+            }
+
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(String::from)
+                .collect()
+        }
+        (None, _) => {
+            return Err("At least base_branch must be specified.".into());
+        }
+    };
+
+    let mut file_commit_map: HashMap<String, String> = HashMap::new();
+    for file in &changed_files {
+        file_commit_map.insert(file.clone(), "PR-final".to_string());
+    }
+
+    println!("Changed files:\n{:?}", changed_files);
+
+    // Now proceed with deletion based on the changed files
+    let files_str = changed_files.join("\n");
+    delete_except(&files_str, &cloned_path)?;
+
+    delete_empty_directories(&cloned_path)?;
+
+    save_commit_map(&file_commit_map)?;
+
+    Ok(())
+}
+
+pub fn find_commit_for_snippet(
+    file_path: &str,
+    code_snippet: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let repo_dir = "/tmp/app";
+    // Ensure the repo directory exists
+    let repo_path = Path::new(repo_dir);
+    if !repo_path.exists() {
+        return Err(format!("Repository directory '{}' does not exist", repo_dir).into());
+    }
+
+    // Run `git log` command from within the repository directory
+    let output = Command::new("git")
+        .args(&["log", "-p", "--pretty=format:%H", "--", file_path])
+        .current_dir(repo_path) // Set the working directory to the repo directory
+        .output()?;
+
+    if !output.status.success() {
+        let error_msg = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to get log for file '{}': {}", file_path, error_msg).into());
+    }
+
+    // Parse the output to find the commit with the code snippet
+    let log_output = String::from_utf8_lossy(&output.stdout);
+    let mut commit_id = None;
+
+    // Split the log output by commit
+    for commit in log_output.split("commit ") {
+        if let Some(commit_hash) = commit.lines().next() {
+            // Check if the commit contains the code snippet
+            if commit.contains(code_snippet) {
+                commit_id = Some(commit_hash.to_string());
+                break;
+            }
+        }
+    }
+
+    Ok(commit_id)
 }
 
 pub async fn post_json_data(url: &str, json_data: Value) -> HashMap<String, String> {

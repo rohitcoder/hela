@@ -10,8 +10,8 @@ use utils::pipeline;
 async fn execute_scan(
     scan_type: &str,
     path: &str,
-    commit_id: Option<&str>,
-    branch: Option<&str>,
+    base_branch: Option<&str>,
+    pr_branch: Option<&str>,
     no_install: bool,
     root_only: bool,
     build_args: String,
@@ -30,8 +30,8 @@ async fn execute_scan(
         .execute_scan(
             scan_type,
             path,
-            commit_id,
-            branch,
+            base_branch,
+            pr_branch,
             no_install,
             root_only,
             build_args,
@@ -41,6 +41,7 @@ async fn execute_scan(
         )
         .await;
 }
+
 #[tokio::main]
 async fn main() {
     // Parse command-line arguments
@@ -53,12 +54,12 @@ async fn main() {
     let mut verbose = false;
     let mut path = String::new();
     let mut rule_path = String::new();
-    let mut commit_id = String::new();
+    let mut base_branch = String::new();
+    let mut pr_branch = String::new();
     let mut defectdojo_url = String::new();
     let mut defectdojo_token = String::new();
     let mut product_name = String::new();
     let mut engagement_name = String::new();
-    let mut branch = String::new();
     let mut policy_url = String::new();
     let mut build_args = String::new();
     let mut manifests = String::new();
@@ -82,15 +83,15 @@ async fn main() {
             Store,
             "Pass the path of the rules to use (Local Path or HTTP Git URL)",
         );
-        ap.refer(&mut commit_id).add_option(
-            &["-i", "--commit-id"],
+        ap.refer(&mut base_branch).add_option(
+            &["--branch"],
             Store,
-            "Pass the commit ID to scan (Optional)",
+            "Specify the base branch to scan or compare",
         );
-        ap.refer(&mut branch).add_option(
-            &["-b", "--branch"],
+        ap.refer(&mut pr_branch).add_option(
+            &["--pr-branch"],
             Store,
-            "Pass the branch name to scan (Optional)",
+            "Specify the PR branch to compare with the base branch (optional)",
         );
         ap.refer(&mut is_sast)
             .add_option(&["-s", "--sast"], StoreTrue, "Run SAST scan");
@@ -148,8 +149,11 @@ async fn main() {
             Store,
             "Pass the build context args to scan",
         );
-        ap.refer(&mut manifests)
-            .add_option(&["-m", "--manifests"], Store, "Pass the manifests pom.xml, requirements.txt etc to scan and we will look for only that kind of manifests");
+        ap.refer(&mut manifests).add_option(
+            &["-m", "--manifests"],
+            Store,
+            "Specify manifest files to scan",
+        );
         ap.refer(&mut slack_url).add_option(
             &["-k", "--slack-url"],
             Store,
@@ -174,20 +178,19 @@ async fn main() {
     if mongo_uri != "" {
         println!("[+] Found DbConnection, we will be using it for filtering out the results");
     }
+
+    let pr_branch_option = if pr_branch.is_empty() {
+        None
+    } else {
+        Some(pr_branch.as_str())
+    };
+
     if is_sast {
         execute_scan(
             "sast",
             &path,
-            if commit_id.is_empty() {
-                None
-            } else {
-                Some(&commit_id)
-            },
-            if branch.is_empty() {
-                None
-            } else {
-                Some(&branch)
-            },
+            Some(&base_branch),
+            pr_branch_option,
             no_install,
             root_only,
             build_args.clone(),
@@ -202,16 +205,8 @@ async fn main() {
         execute_scan(
             "sca",
             &path,
-            if commit_id.is_empty() {
-                None
-            } else {
-                Some(&commit_id)
-            },
-            if branch.is_empty() {
-                None
-            } else {
-                Some(&branch)
-            },
+            Some(&base_branch),
+            pr_branch_option,
             no_install,
             root_only,
             build_args.clone(),
@@ -226,16 +221,8 @@ async fn main() {
         execute_scan(
             "secret",
             &path,
-            if commit_id.is_empty() {
-                None
-            } else {
-                Some(&commit_id)
-            },
-            if branch.is_empty() {
-                None
-            } else {
-                Some(&branch)
-            },
+            Some(&base_branch),
+            pr_branch_option,
             no_install,
             root_only,
             build_args.clone(),
@@ -250,16 +237,8 @@ async fn main() {
         execute_scan(
             "license-compliance",
             &path,
-            if commit_id.is_empty() {
-                None
-            } else {
-                Some(&commit_id)
-            },
-            if branch.is_empty() {
-                None
-            } else {
-                Some(&branch)
-            },
+            Some(&base_branch),
+            pr_branch_option,
             no_install,
             root_only,
             build_args.clone(),
@@ -288,7 +267,6 @@ async fn main() {
             is_license_compliance,
             policy_url,
             slack_url,
-            commit_id,
             job_id,
             mongo_uri,
             defectdojo_url,

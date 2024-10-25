@@ -14,8 +14,8 @@ impl SecretTool {
     pub async fn run_scan(
         &self,
         _path: &str,
-        _commit_id: Option<&str>,
         _branch: Option<&str>,
+        pr_branch: Option<&str>,
         verbose: bool,
     ) {
         let start_time = Instant::now();
@@ -24,25 +24,9 @@ impl SecretTool {
                 if verbose {
                     println!("[+] Cloning git repo...");
                 }
-                if let Some(_branch) = _branch {
-                    if _commit_id.is_some() {
-                        let branch = Some(_branch);
-                        let out = checkout(_path, "/tmp/app", _commit_id, branch);
-                        if out.is_err() {
-                            println!("Error while cloning: {}", out.err().unwrap());
-                        }
-                    } else {
-                        let branch = Some(_branch);
-                        let out = checkout(_path, "/tmp/app", None, branch);
-                        if out.is_err() {
-                            println!("Error while cloning: {}", out.err().unwrap());
-                        }
-                    }
-                } else {
-                    let out = checkout(_path, "/tmp/app", None, None);
-                    if out.is_err() {
-                        println!("Error while cloning: {}", out.err().unwrap());
-                    }
+                let out = checkout(_path, "/tmp/app", _branch, pr_branch);
+                if out.is_err() {
+                    println!("Error while cloning: {}", out.err().unwrap());
                 }
             } else {
                 if verbose {

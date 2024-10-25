@@ -3,7 +3,8 @@ use serde_json::{json, Value};
 use std::{collections::HashMap, process::exit};
 
 use crate::utils::common::{
-    bulk_check_hash_exists, get_commit_of_file, insert_job_info, slack_alert, upload_to_defect_dojo,
+    bulk_check_hash_exists, find_commit_for_snippet, insert_job_info, slack_alert,
+    upload_to_defect_dojo,
 };
 
 use super::common::{self, execute_command, print_error, redact_github_token};
@@ -16,7 +17,6 @@ pub async fn pipeline_failure(
     is_license_compliance: bool,
     policy_url: String,
     slack_url: String,
-    commit_id: String,
     job_id: String,
     mongo_uri: String,
     defectdojo_url: String,
@@ -62,11 +62,8 @@ pub async fn pipeline_failure(
         cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
     }
     let mut commit_path = String::new();
-    if !commit_id.is_empty() {
-        commit_path = format!("{}/commit/{}", cleaned_code_path.clone(), commit_id);
-        slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
-    }
-
+    commit_path = format!("{}/commit", cleaned_code_path.clone());
+    slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
     println!(
         "\n\n 🔎 Hela Security Scan Results for {}",
         redacted_code_path
@@ -94,12 +91,12 @@ pub async fn pipeline_failure(
             };
             let vuln_path_str = format!("{}:{}", vuln_path_result, vuln_path_line);
             let vuln_path = String::from(vuln_path_str);
-
+            let commit_id =
+                find_commit_for_snippet(&vuln_path, &result["extra"]["lines"].to_string()).unwrap();
             sast_result.insert("check_id", result["check_id"].to_string());
             sast_result.insert("path", vuln_path);
             sast_result.insert("severity", result["extra"]["severity"].to_string());
             let mut message = result["extra"]["message"].to_string();
-            message = format!("{}\n\nCommit: {}", message, commit_path);
             sast_result.insert("message", message);
             sast_result.insert("lines", result["extra"]["lines"].to_string());
 
@@ -492,9 +489,17 @@ pub async fn pipeline_failure(
         // Collect all secret records and their hashes
         for value in secret_results.clone() {
             // Append to slack alert message, remove first 2 values after split with "/"
-            let file_commit = get_commit_of_file(&value["file"]);
+            let commit_id =
+                find_commit_for_snippet(&value["file"], &value["raw"].to_string()).unwrap();
             let commit_base_link = commit_path.split("/commit").collect::<Vec<&str>>()[0];
-            let commit_link = format!("{}/commit/{}", commit_base_link, file_commit.unwrap());
+            let commit_link = format!(
+                "{}/commit/{}",
+                commit_base_link,
+                match commit_id {
+                    Some(commit_id) => commit_id,
+                    None => "UNKNOWN".to_string(),
+                }
+            );
             let vuln_record = format!(
                 "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}\nCommit: {}",
                 value["file"], value["line"], value["raw"], value["detector_name"], commit_link
@@ -676,9 +681,6 @@ pub async fn pipeline_failure(
             tags.push(Value::String(
                 commiter_info["name"].to_string().replace("\"", ""),
             ));
-            if !commit_id.is_empty() {
-                tags.push(Value::String(commit_id.to_string()));
-            }
             tags.push(Value::String("SAST".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));
             sast_result.insert(
@@ -742,9 +744,6 @@ pub async fn pipeline_failure(
                             serde_json::Value::String(severity.to_string()),
                         );
                         let mut tags = Vec::new();
-                        if !commit_id.is_empty() {
-                            tags.push(Value::String(commit_id.to_string()));
-                        }
                         tags.push(Value::String("SCA".to_string()));
                         properties.insert("tags".to_string(), serde_json::Value::Array(tags));
                         sca_result.insert(
@@ -822,9 +821,6 @@ pub async fn pipeline_failure(
                 tags.push(Value::String(
                     commiter_info["name"].to_string().replace("\"", ""),
                 ));
-                if !commit_id.is_empty() {
-                    tags.push(Value::String(commit_id.to_string()));
-                }
             }
             tags.push(Value::String("SECRET".to_string()));
             properties.insert("tags".to_string(), serde_json::Value::Array(tags));

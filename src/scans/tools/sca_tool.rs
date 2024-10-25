@@ -204,8 +204,8 @@ impl ScaTool {
     pub async fn run_scan(
         &self,
         _path: &str,
-        _commit_id: Option<&str>,
         _branch: Option<&str>,
+        pr_branch: Option<&str>,
         no_install: bool,
         root_only: bool,
         build_args: String,
@@ -215,8 +215,6 @@ impl ScaTool {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running SCA scan on path: {}", _path);
-            println!("[+] Commit ID: {}", _commit_id.unwrap_or("None"));
-            println!("[+] Branch: {}", _branch.unwrap_or("None"));
             println!("[+] Build args: {}", build_args.clone());
             println!("[+] Manifests: {}", manfiests.clone());
         }
@@ -245,25 +243,9 @@ impl ScaTool {
                 if verbose {
                     println!("[+] Cloning git repo...");
                 }
-                if let Some(_branch) = _branch {
-                    if _commit_id.is_some() {
-                        let branch = Some(_branch);
-                        let out = checkout(_path, "/tmp/app", _commit_id, branch);
-                        if out.is_err() {
-                            println!("Error while cloning: {}", out.err().unwrap());
-                        }
-                    } else {
-                        let branch = Some(_branch);
-                        let out = checkout(_path, "/tmp/app", None, branch);
-                        if out.is_err() {
-                            println!("Error while cloning: {}", out.err().unwrap());
-                        }
-                    }
-                } else {
-                    let out = checkout(_path, "/tmp/app", None, None);
-                    if out.is_err() {
-                        println!("Error while cloning: {}", out.err().unwrap());
-                    }
+                let out = checkout(_path, "/tmp/app", _branch, pr_branch);
+                if out.is_err() {
+                    println!("Error while cloning: {}", out.err().unwrap());
                 }
             } else {
                 if verbose {
