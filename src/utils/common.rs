@@ -384,71 +384,95 @@ fn get_cumulative_pr_files(
 pub fn checkout(
     clone_url: &str,
     clone_path: &str,
-    base_branch: Option<&str>,
+    branch: Option<&str>,
     pr_branch: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Clone the repository
+    // Clone the repository; use the specified branch or default branch if `branch` is None
     let mut clone_cmd = Command::new("git");
     clone_cmd.arg("clone").arg(clone_url).arg(clone_path);
-
-    if let Some(branch) = base_branch {
-        clone_cmd.arg("--branch").arg(branch);
+    if let Some(branch_name) = branch {
+        clone_cmd.arg("--branch").arg(branch_name);
     }
-
     let output = clone_cmd.output()?;
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Failed to clone repository: {}", error_msg).into());
     }
 
+    // Set the working directory to the cloned path
     let cloned_path = Path::new(clone_path).canonicalize()?;
     env::set_current_dir(&cloned_path)?;
 
-    // Get the list of changed files
-    let changed_files = match (base_branch, pr_branch) {
-        (Some(base), Some(pr)) => {
-            let fetch_output = Command::new("git")
-                .args(&["fetch", "origin", pr])
-                .output()?;
-            if !fetch_output.status.success() {
-                let error_msg = String::from_utf8_lossy(&fetch_output.stderr);
-                return Err(format!("Failed to fetch PR branch: {}", error_msg).into());
-            }
-            get_cumulative_pr_files(Some(base), Some(&format!("origin/{}", pr)))?
-        }
-        (Some(base), None) => {
-            let output = Command::new("git")
-                .args(&["ls-tree", "-r", "--name-only", base])
-                .output()?;
-            if !output.status.success() {
-                let error_msg = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to list files in base branch: {}", error_msg).into());
-            }
+    // Configure Git user for commits in this repository
+    Command::new("git")
+        .args(&["config", "user.email", "ci@hela.int"])
+        .output()?;
+    Command::new("git")
+        .args(&["config", "user.name", "CI Bot"])
+        .output()?;
 
-            String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .map(String::from)
-                .collect()
+    // If a pr_branch is provided, fetch it as a local branch and compare with the base branch
+    if let Some(pr_branch_name) = pr_branch {
+        // Fetch the PR branch and create a local branch
+        let fetch_output = Command::new("git")
+            .args(&[
+                "fetch",
+                "origin",
+                &format!("{}:{}", pr_branch_name, pr_branch_name),
+            ])
+            .output()?;
+        if !fetch_output.status.success() {
+            let error_msg = String::from_utf8_lossy(&fetch_output.stderr);
+            return Err(format!(
+                "Failed to fetch PR branch '{}': {}",
+                pr_branch_name, error_msg
+            )
+            .into());
         }
-        (None, _) => {
-            return Err("At least base_branch must be specified.".into());
-        }
-    };
 
-    let mut file_commit_map: HashMap<String, String> = HashMap::new();
-    for file in &changed_files {
-        file_commit_map.insert(file.clone(), "PR-final".to_string());
+        // Perform a diff between `branch` (or the default branch) and `pr_branch`
+        let base_branch = branch.unwrap_or("HEAD");
+        let diff_output = Command::new("git")
+            .args(&["diff", "--name-only", base_branch, pr_branch_name])
+            .output()?;
+
+        if !diff_output.status.success() {
+            let error_msg = String::from_utf8_lossy(&diff_output.stderr);
+            return Err(format!("Failed to diff branches: {}", error_msg).into());
+        }
+
+        // Parse the diff output
+        let changed_files = String::from_utf8_lossy(&diff_output.stdout)
+            .lines()
+            .map(String::from)
+            .collect::<Vec<String>>();
+
+        println!(
+            "Changed files in PR branch '{}': {:?}",
+            pr_branch_name, changed_files
+        );
+    } else {
+        // If no PR branch, list all files in the base branch
+        let list_output = Command::new("git")
+            .args(&["ls-tree", "-r", "--name-only", "HEAD"])
+            .output()?;
+
+        if !list_output.status.success() {
+            let error_msg = String::from_utf8_lossy(&list_output.stderr);
+            return Err(format!("Failed to list files in base branch: {}", error_msg).into());
+        }
+
+        let files = String::from_utf8_lossy(&list_output.stdout)
+            .lines()
+            .map(String::from)
+            .collect::<Vec<String>>();
+
+        println!(
+            "Files in branch '{}': {:?}",
+            branch.unwrap_or("default branch"),
+            files
+        );
     }
-
-    println!("Changed files:\n{:?}", changed_files);
-
-    // Now proceed with deletion based on the changed files
-    let files_str = changed_files.join("\n");
-    delete_except(&files_str, &cloned_path)?;
-
-    delete_empty_directories(&cloned_path)?;
-
-    save_commit_map(&file_commit_map)?;
 
     Ok(())
 }
