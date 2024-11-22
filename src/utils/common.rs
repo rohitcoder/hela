@@ -418,7 +418,7 @@ fn save_pr_branch_files(
 }
 
 // Set global Git config for user email and name
-fn set_git_global_user_config() -> Result<(), Box<dyn std::error::Error>> {
+pub fn set_git_global_user_config() -> Result<(), Box<dyn std::error::Error>> {
     // Set global email
     Command::new("git")
         .args(&["config", "--global", "user.email", "helabot@groww.in"])
@@ -439,7 +439,7 @@ pub fn checkout(
     pr_branch: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Clone the repository
-    set_git_user_config()?;
+    set_git_global_user_config()?;
     let mut clone_cmd = Command::new("git");
     clone_cmd.arg("clone").arg(clone_url).arg(clone_path);
     if let Some(branch) = base_branch {
