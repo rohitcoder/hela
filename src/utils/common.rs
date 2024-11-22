@@ -98,30 +98,24 @@ pub async fn bulk_check_hash_exists(
     mongo_uri: &str,
 ) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
     let client = connect_to_mongodb(mongo_uri, "code-security-open-source").await?;
-    // let existing_hashes = find_messages_in_hashes(&client, hashes).await?;
-    // returb blank HashSet if no hashes found
-    let existing_hashes = HashSet::new();
-    let blank_hashset = HashSet::new();
-    if existing_hashes.is_empty() {
-        return Ok(blank_hashset);
-    }
+    let existing_hashes = find_messages_in_hashes(&client, hashes).await?;
     Ok(existing_hashes)
 }
 
 pub async fn register_hash(message: &str, mongo_uri: &str) {
     let hashed_message = hash_text(message);
-    // match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
-    //     Ok(client) => {
-    //         let collection = client
-    //             .database("code-security-open-source")
-    //             .collection("hashes");
-    //         let document = doc! { "message": hashed_message };
-    //         collection.insert_one(document, None).await.unwrap();
-    //     }
-    //     Err(e) => {
-    //         print_error(&format!("Error: {}", e.to_string()), 101);
-    //     }
-    // }
+    match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
+        Ok(client) => {
+            let collection = client
+                .database("code-security-open-source")
+                .collection("hashes");
+            let document = doc! { "message": hashed_message };
+            collection.insert_one(document, None).await.unwrap();
+        }
+        Err(e) => {
+            print_error(&format!("Error: {}", e.to_string()), 101);
+        }
+    }
 }
 pub fn print_error(error: &str, error_code: i32) {
     if error.to_lowercase().starts_with("warning") {
