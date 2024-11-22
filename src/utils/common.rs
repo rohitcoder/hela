@@ -4,22 +4,23 @@ use futures::StreamExt;
 use mongodb::{
     bson::{doc, Bson, Document},
     error::Error,
-    options::{ClientOptions, FindOptions},
+    options::ClientOptions,
     Client, Collection,
 };
 
 use chrono::Utc;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::fs::{self, File};
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::io::{Read, Write};
+use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashMap, process::Command};
 use std::{collections::HashSet, env};
+use std::{
+    fs::{self, File},
+    path::PathBuf,
+};
 
 // define static exit codes and message
 pub const EXIT_CODE_LICENSE_FAILED: i32 = 101;
@@ -47,7 +48,7 @@ pub async fn upload_to_defect_dojo(
     engagement_name: &str,
     filename: &str,
 ) -> Result<(), reqwest::Error> {
-    let mut file = File::open(filename.clone()).unwrap();
+    let mut file = File::open(filename).unwrap();
 
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
@@ -142,7 +143,7 @@ pub fn redact_github_token(input: &str) -> String {
 
 async fn connect_to_mongodb(
     mongo_uri: &str,
-    db_name: &str,
+    _db_name: &str,
 ) -> Result<Client, mongodb::error::Error> {
     let client_options = ClientOptions::parse(mongo_uri).await?;
     let client = Client::with_options(client_options)?;
@@ -266,159 +267,203 @@ pub async fn execute_command(command: &str, suppress_error: bool) -> String {
     stdout.to_string()
 }
 
+fn delete_except(files: &[String], base_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Deleting all files except the following:");
+    println!("__________________________________________ {:?}", files);
+    let files_to_keep: Vec<PathBuf> = files
+        .iter()
+        .map(|file| base_dir.join(file.trim()))
+        .collect();
+
+    traverse_and_delete(base_dir, &files_to_keep)?;
+
+    Ok(())
+}
+
+fn traverse_and_delete(base_dir: &Path, files_to_keep: &[PathBuf]) -> Result<(), std::io::Error> {
+    for entry in fs::read_dir(base_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Skip the .git directory
+        if path.is_dir() && path.file_name().map_or(false, |name| name == ".git") {
+            continue;
+        }
+
+        if path.is_dir() {
+            traverse_and_delete(&path, files_to_keep)?;
+        }
+
+        // Check if the path should be deleted (only delete files)
+        if path.is_file() && !files_to_keep.contains(&path.canonicalize()?) {
+            fs::remove_file(&path)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn delete_empty_directories(start_dir: &Path) -> Result<(), std::io::Error> {
+    for entry in fs::read_dir(start_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // Skip the .git directory
+        if path.is_dir() && path.file_name().map_or(false, |name| name == ".git") {
+            continue;
+        }
+
+        if path.is_dir() {
+            delete_empty_directories(&path)?;
+            if fs::read_dir(&path)?.next().is_none() {
+                fs::remove_dir(&path)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn get_cumulative_pr_files(
+    base_branch: Option<&str>,
+    pr_branch: Option<&str>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    if let Some(pr) = pr_branch {
+        // If base branch is provided, merge it into a temp branch
+        if let Some(base) = base_branch {
+            // Step 1: Checkout the base branch
+            Command::new("git").args(&["checkout", base]).output()?;
+
+            // Step 2: Create a temporary merge branch
+            Command::new("git")
+                .args(&["checkout", "-b", "temp_pr_merge_branch", base])
+                .output()?;
+
+            // Step 3: Merge the PR branch into the temporary branch
+            let merge_output = Command::new("git")
+                .args(&["merge", "--no-ff", &format!("origin/{}", pr)])
+                .output()?;
+            if !merge_output.status.success() {
+                let error_msg = String::from_utf8_lossy(&merge_output.stderr);
+                return Err(format!("Failed to merge PR branch: {}", error_msg).into());
+            }
+
+            // Step 4: Get the list of changed files between base and temp PR branch
+            let diff_output = Command::new("git")
+                .args(&["diff", "--name-only", base, "temp_pr_merge_branch"])
+                .output()?;
+            if !diff_output.status.success() {
+                let error_msg = String::from_utf8_lossy(&diff_output.stderr);
+                return Err(format!("Failed to get changed files: {}", error_msg).into());
+            }
+
+            let changed_files: Vec<String> = String::from_utf8_lossy(&diff_output.stdout)
+                .lines()
+                .map(String::from)
+                .collect();
+
+            // No cleanup: Stay on the temporary branch to get the PR branch content
+
+            Ok(changed_files)
+        } else {
+            // If only PR branch is provided, just get the list of files in that branch
+            let diff_output = Command::new("git")
+                .args(&["ls-tree", "-r", "--name-only", &format!("origin/{}", pr)])
+                .output()?;
+            if !diff_output.status.success() {
+                let error_msg = String::from_utf8_lossy(&diff_output.stderr);
+                return Err(format!("Failed to list files in PR branch: {}", error_msg).into());
+            }
+
+            let changed_files: Vec<String> = String::from_utf8_lossy(&diff_output.stdout)
+                .lines()
+                .map(String::from)
+                .collect();
+            Ok(changed_files)
+        }
+    } else {
+        Err("PR branch is required to fetch changes.".into())
+    }
+}
+
+fn save_pr_branch_files(
+    changed_files: &[String],
+    pr_branch: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for file in changed_files {
+        let file_content = Command::new("git")
+            .args(&["show", &format!("origin/{}:{}", pr_branch, file)])
+            .output()?;
+        if !file_content.status.success() {
+            let error_msg = String::from_utf8_lossy(&file_content.stderr);
+            return Err(format!("Failed to get content of file {}: {}", file, error_msg).into());
+        }
+
+        let file_path = Path::new(file);
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut file_handle = File::create(file_path)?;
+        file_handle.write_all(&file_content.stdout)?;
+    }
+
+    Ok(())
+}
+
 pub fn checkout(
     clone_url: &str,
     clone_path: &str,
-    branch: Option<&str>,
+    base_branch: Option<&str>,
     pr_branch: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Clone the repository; use the specified branch or default branch if `branch` is None
+    // Step 1: Clone the repository
     let mut clone_cmd = Command::new("git");
     clone_cmd.arg("clone").arg(clone_url).arg(clone_path);
-    if let Some(branch_name) = branch {
-        clone_cmd.arg("--branch").arg(branch_name);
+    if let Some(branch) = base_branch {
+        clone_cmd.arg("--branch").arg(branch);
     }
+
     let output = clone_cmd.output()?;
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Failed to clone repository: {}", error_msg).into());
     }
 
-    // Set the working directory to the cloned path
     let cloned_path = Path::new(clone_path).canonicalize()?;
-    let repo_path = cloned_path.to_str().unwrap();
     env::set_current_dir(&cloned_path)?;
 
-    // Configure Git user for commits in this repository
-    Command::new("git")
-        .args(&["config", "user.email", "ci@example.com"])
-        .output()?;
-    Command::new("git")
-        .args(&["config", "user.name", "CI Bot"])
-        .output()?;
-
-    // Store the set of changed files
-    let mut changed_files = HashSet::new();
-
-    // If a pr_branch is provided, fetch it as a local branch and compare with the base branch
-    if let Some(pr_branch_name) = pr_branch {
-        // Fetch the PR branch and create a local branch
+    // Fetch the PR branch
+    if let Some(pr) = pr_branch {
         let fetch_output = Command::new("git")
-            .args(&[
-                "fetch",
-                "origin",
-                &format!("{}:{}", pr_branch_name, pr_branch_name),
-            ])
+            .args(&["fetch", "origin", pr])
             .output()?;
         if !fetch_output.status.success() {
             let error_msg = String::from_utf8_lossy(&fetch_output.stderr);
-            return Err(format!(
-                "Failed to fetch PR branch '{}': {}",
-                pr_branch_name, error_msg
-            )
-            .into());
-        }
-
-        // Perform a diff between `branch` (or the default branch) and `pr_branch`
-        let base_branch = branch.unwrap_or("HEAD");
-        let diff_output = Command::new("git")
-            .args(&["diff", "--name-only", base_branch, pr_branch_name])
-            .output()?;
-
-        if !diff_output.status.success() {
-            let error_msg = String::from_utf8_lossy(&diff_output.stderr);
-            return Err(format!("Failed to diff branches: {}", error_msg).into());
-        }
-
-        // Parse the diff output into a set of changed files
-        let diff_output_str = String::from_utf8_lossy(&diff_output.stdout);
-        for line in diff_output_str.lines() {
-            changed_files.insert(line.trim().to_string());
-        }
-    } else {
-        // If no PR branch, list all files in the base branch
-        let list_output = Command::new("git")
-            .args(&["ls-tree", "-r", "--name-only", "HEAD"])
-            .output()?;
-
-        if !list_output.status.success() {
-            let error_msg = String::from_utf8_lossy(&list_output.stderr);
-            return Err(format!("Failed to list files in base branch: {}", error_msg).into());
-        }
-
-        // Parse the list output into a set of files
-        let list_output_str = String::from_utf8_lossy(&list_output.stdout);
-        for line in list_output_str.lines() {
-            changed_files.insert(line.trim().to_string());
+            return Err(format!("Failed to fetch PR branch: {}", error_msg).into());
         }
     }
 
-    // Print the changed files for debugging purposes
-    println!("Changed files:\n{:#?}", changed_files);
-
-    // Ensure the working directory is up-to-date before checking out files
-    Command::new("git")
-        .args(&["checkout", pr_branch.unwrap_or("HEAD")])
-        .output()?;
-
-    // Ensure each changed file is checked out from the PR branch
-    for file in &changed_files {
-        let checkout_output = Command::new("git")
-            .args(&["checkout", pr_branch.unwrap_or("HEAD"), "--", file])
-            .output()?;
-
-        if !checkout_output.status.success() {
-            let error_msg = String::from_utf8_lossy(&checkout_output.stderr);
-            println!("Failed to checkout file '{}': {}", file, error_msg);
+    // Get the list of changed files
+    let changed_files = match (base_branch, pr_branch) {
+        (Some(base), Some(pr)) => get_cumulative_pr_files(Some(base), Some(pr))?,
+        (None, Some(pr)) => get_cumulative_pr_files(None, Some(pr))?,
+        _ => {
+            return Err("At least PR branch must be specified.".into());
         }
+    };
+
+    println!("Changed files:\n{:?}", changed_files);
+
+    // Save the content of the changed files from the PR branch
+    if let Some(pr) = pr_branch {
+        save_pr_branch_files(&changed_files, pr)?;
     }
 
-    // Remove all files not in the `changed_files` set
-    remove_unwanted_files(repo_path, &changed_files)?;
+    // Now proceed with deletion based on the changed files
+    delete_except(&changed_files, &cloned_path)?;
+    delete_empty_directories(&cloned_path)?;
 
-    println!("Only the changed files have been kept locally.");
-
-    Ok(())
-}
-
-/// Removes all files that are not in the `files_to_keep` set, but preserves directories.
-///
-/// # Arguments
-///
-/// * `repo_path` - The path of the repository.
-/// * `files_to_keep` - A set of file paths to keep relative to the `repo_path`.
-fn remove_unwanted_files(
-    repo_path: &str,
-    files_to_keep: &HashSet<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Recursively remove unwanted files
-    for entry in fs::read_dir(repo_path)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        // Skip the .git directory to preserve repository integrity
-        if path.is_dir() && path.file_name().map_or(false, |name| name == ".git") {
-            continue;
-        }
-
-        // Determine the relative path
-        let relative_path = path.strip_prefix(repo_path)?.to_str().unwrap().to_string();
-
-        // Check if the file should be kept or removed
-        if path.is_file() && !files_to_keep.contains(&relative_path) {
-            println!("Removing file: {}", relative_path);
-            fs::remove_file(&path)?;
-        } else if path.is_dir() {
-            // Recursively clean up subdirectories
-            remove_unwanted_files(path.to_str().unwrap(), files_to_keep)?;
-
-            // Check if the directory is empty and remove it
-            if fs::read_dir(&path)?.next().is_none() {
-                println!("Removing empty directory: {}", relative_path);
-                fs::remove_dir(&path)?;
-            }
-        }
-    }
     Ok(())
 }
 

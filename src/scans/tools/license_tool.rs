@@ -1,11 +1,12 @@
-
 use std::{collections::HashMap, time::Instant};
 
 use mongodb::bson::uuid;
 use serde_json::json;
 
-use crate::{utils::{common::{execute_command, post_json_data}, file_utils::find_files_recursively}, scans::tools::sca_tool::SUPPORTED_MANIFESTS};
-
+use crate::{
+    scans::tools::sca_tool::SUPPORTED_MANIFESTS,
+    utils::{common::execute_command, file_utils::find_files_recursively},
+};
 
 pub struct LicenseTool;
 
@@ -13,8 +14,14 @@ impl LicenseTool {
     pub fn new() -> Self {
         LicenseTool
     }
-    
-    pub async fn run_scan(&self, _path: &str, _commit_id: Option<&str>, _branch: Option<&str>, verbose: bool) {
+
+    pub async fn run_scan(
+        &self,
+        _path: &str,
+        _commit_id: Option<&str>,
+        _branch: Option<&str>,
+        verbose: bool,
+    ) {
         let start_time = Instant::now();
         if verbose {
             println!("[+] Running License compliance scan on path: {}", _path);
@@ -33,11 +40,11 @@ impl LicenseTool {
                 if let Some(_branch) = _branch {
                     let clone_command = format!("git clone -b {} {} /tmp/app", _branch, _path);
                     execute_command(&clone_command, false).await;
-                }else{
+                } else {
                     let clone_command = format!("git clone {} /tmp/app", _path);
                     execute_command(&clone_command, false).await;
                 }
-            }else{
+            } else {
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
@@ -58,20 +65,27 @@ impl LicenseTool {
             // now run secret scan on /tmp/code folder
             _path = format!("/tmp/code");
         }
-        let manifests = find_files_recursively(&_path, unsafe { SUPPORTED_MANIFESTS.to_vec() }, ignore_dirs).await;
+        let manifests =
+            find_files_recursively(&_path, unsafe { SUPPORTED_MANIFESTS.to_vec() }, ignore_dirs)
+                .await;
         let mut manifest_license = HashMap::new();
         for manifest in manifests.iter() {
             let file_name = manifest.split("/").last().unwrap();
             let folder_path = manifest.replace(file_name, "");
             let random_file_name = format!("{}.json", uuid::Uuid::new().to_string());
             // if manifest ends with pom.xml then pass -t java otherwise nothing
-            let mut license_command = format!("cd {} && cdxgen -o {}", folder_path, random_file_name);
+            let mut license_command =
+                format!("cd {} && cdxgen -o {}", folder_path, random_file_name);
             if file_name.ends_with("pom.xml") {
-                license_command = format!("cd {} && cdxgen -o {} -t java", folder_path, random_file_name);
+                license_command = format!(
+                    "cd {} && cdxgen -o {} -t java",
+                    folder_path, random_file_name
+                );
             }
             execute_command(&license_command, false).await;
             // Read JSON file and parse data
-            let license_json = std::fs::read_to_string(format!("{}/{}", folder_path, random_file_name)).unwrap();
+            let license_json =
+                std::fs::read_to_string(format!("{}/{}", folder_path, random_file_name)).unwrap();
             let json_data = serde_json::from_str::<serde_json::Value>(&license_json).unwrap();
             // extract license data from "components" key there will be list of components so grab licenses from there
             let components = json_data["components"].as_array().unwrap();
@@ -87,8 +101,14 @@ impl LicenseTool {
                         license_names.push(license["id"].as_str().unwrap().to_string());
                     }
                 }
-                component_licenses.insert(format!("{}@{}", component_name, component_version), license_names);
-                manifest_license.insert(format!("{}/{}", folder_path, file_name), component_licenses.clone());
+                component_licenses.insert(
+                    format!("{}@{}", component_name, component_version),
+                    license_names,
+                );
+                manifest_license.insert(
+                    format!("{}/{}", folder_path, file_name),
+                    component_licenses.clone(),
+                );
             }
         }
         // save data in output.json and before that get json data from output.json file if it exists and then append new data to it
@@ -99,10 +119,17 @@ impl LicenseTool {
             output_json = serde_json::from_str::<serde_json::Value>(&output_json_data).unwrap();
         }
         output_json["license"] = json!(manifest_license);
-        std::fs::write("/tmp/output.json", serde_json::to_string_pretty(&output_json).unwrap()).unwrap();
+        std::fs::write(
+            "/tmp/output.json",
+            serde_json::to_string_pretty(&output_json).unwrap(),
+        )
+        .unwrap();
         let end_time = Instant::now();
         let elapsed_time = end_time - start_time;
         let elapsed_seconds = elapsed_time.as_secs_f64().round();
-        println!("Execution time for License Compliance scan: {:?} seconds", elapsed_seconds);
+        println!(
+            "Execution time for License Compliance scan: {:?} seconds",
+            elapsed_seconds
+        );
     }
 }

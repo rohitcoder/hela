@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs, time::Instant};
 use serde_json::{json, Value};
 
 use crate::utils::{
-    common::{checkout, execute_command, post_json_data},
+    common::{checkout, execute_command},
     file_utils::find_files_recursively,
 };
 
@@ -251,7 +251,7 @@ impl ScaTool {
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
-                let copy_command = format!("cp -r {} /tmp/app", _path.clone());
+                let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
         }

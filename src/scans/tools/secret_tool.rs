@@ -32,7 +32,7 @@ impl SecretTool {
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
-                let copy_command = format!("cp -r {} /tmp/app", _path.clone());
+                let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
         }

@@ -21,7 +21,7 @@ impl SastTool {
     ) {
         let start_time = Instant::now();
         if verbose {
-            println!("[+] Running SAST scan on path: {}", _path.clone());
+            println!("[+] Running SAST scan on path: {}", _path);
         }
         println!("Commit ID: {:?}", _commit_id);
         println!("Branch: {:?}", _branch);
@@ -54,7 +54,7 @@ impl SastTool {
                 if verbose {
                     println!("[+] Copying project to /tmp/app...");
                 }
-                let copy_command = format!("cp -r {} /tmp/app", _path.clone());
+                let copy_command = format!("cp -r {} /tmp/app", _path);
                 execute_command(&copy_command, true).await;
             }
         }
