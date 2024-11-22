@@ -98,24 +98,30 @@ pub async fn bulk_check_hash_exists(
     mongo_uri: &str,
 ) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
     let client = connect_to_mongodb(mongo_uri, "code-security-open-source").await?;
-    let existing_hashes = find_messages_in_hashes(&client, hashes).await?;
+    // let existing_hashes = find_messages_in_hashes(&client, hashes).await?;
+    // returb blank HashSet if no hashes found
+    let existing_hashes = HashSet::new();
+    let blank_hashset = HashSet::new();
+    if existing_hashes.is_empty() {
+        return Ok(blank_hashset);
+    }
     Ok(existing_hashes)
 }
 
 pub async fn register_hash(message: &str, mongo_uri: &str) {
     let hashed_message = hash_text(message);
-    match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
-        Ok(client) => {
-            let collection = client
-                .database("code-security-open-source")
-                .collection("hashes");
-            let document = doc! { "message": hashed_message };
-            collection.insert_one(document, None).await.unwrap();
-        }
-        Err(e) => {
-            print_error(&format!("Error: {}", e.to_string()), 101);
-        }
-    }
+    // match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
+    //     Ok(client) => {
+    //         let collection = client
+    //             .database("code-security-open-source")
+    //             .collection("hashes");
+    //         let document = doc! { "message": hashed_message };
+    //         collection.insert_one(document, None).await.unwrap();
+    //     }
+    //     Err(e) => {
+    //         print_error(&format!("Error: {}", e.to_string()), 101);
+    //     }
+    // }
 }
 pub fn print_error(error: &str, error_code: i32) {
     if error.to_lowercase().starts_with("warning") {
@@ -411,6 +417,30 @@ fn save_pr_branch_files(
     Ok(())
 }
 
+fn set_git_user_config() -> Result<(), Box<dyn std::error::Error>> {
+    let email_output = Command::new("git")
+        .args(&["config", "--get", "user.email"])
+        .output()?;
+    if !email_output.status.success() {
+        // Set default email if not already configured
+        Command::new("git")
+            .args(&["config", "--local", "user.email", "temp@example.com"])
+            .output()?;
+    }
+
+    let name_output = Command::new("git")
+        .args(&["config", "--get", "user.name"])
+        .output()?;
+    if !name_output.status.success() {
+        // Set default name if not already configured
+        Command::new("git")
+            .args(&["config", "--local", "user.name", "Temporary User"])
+            .output()?;
+    }
+
+    Ok(())
+}
+
 pub fn checkout(
     clone_url: &str,
     clone_path: &str,
@@ -418,6 +448,7 @@ pub fn checkout(
     pr_branch: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Clone the repository
+    set_git_user_config()?;
     let mut clone_cmd = Command::new("git");
     clone_cmd.arg("clone").arg(clone_url).arg(clone_path);
     if let Some(branch) = base_branch {
