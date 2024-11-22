@@ -417,26 +417,17 @@ fn save_pr_branch_files(
     Ok(())
 }
 
-fn set_git_user_config() -> Result<(), Box<dyn std::error::Error>> {
-    let email_output = Command::new("git")
-        .args(&["config", "--get", "user.email"])
+// Set global Git config for user email and name
+fn set_git_global_user_config() -> Result<(), Box<dyn std::error::Error>> {
+    // Set global email
+    Command::new("git")
+        .args(&["config", "--global", "user.email", "helabot@groww.in"])
         .output()?;
-    if !email_output.status.success() {
-        // Set default email if not already configured
-        Command::new("git")
-            .args(&["config", "--local", "user.email", "temp@example.com"])
-            .output()?;
-    }
 
-    let name_output = Command::new("git")
-        .args(&["config", "--get", "user.name"])
+    // Set global name
+    Command::new("git")
+        .args(&["config", "--global", "user.name", "Hela Bot"])
         .output()?;
-    if !name_output.status.success() {
-        // Set default name if not already configured
-        Command::new("git")
-            .args(&["config", "--local", "user.name", "Temporary User"])
-            .output()?;
-    }
 
     Ok(())
 }
