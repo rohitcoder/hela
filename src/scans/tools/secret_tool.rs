@@ -2,7 +2,9 @@ use std::{fs, time::Instant};
 
 use serde_json::{json, Value};
 
-use crate::utils::common::{checkout, count_env_variables, execute_command, print_error};
+use crate::utils::common::{
+    checkout, count_env_variables, execute_command, list_whitelisted_secrets, print_error,
+};
 
 pub struct SecretTool;
 
@@ -16,6 +18,7 @@ impl SecretTool {
         _path: &str,
         _branch: Option<&str>,
         pr_branch: Option<&str>,
+        mongo_uri: &str,
         verbose: bool,
     ) {
         let start_time = Instant::now();
@@ -61,7 +64,9 @@ impl SecretTool {
 
         let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO,GETRESPONSE,ATERA,GITTER,SONARCLOUD,AZURESEARCHADMINKEY", _path);
         let output_data = execute_command(&cmd, true).await;
+
         let mut results: Vec<Value> = Vec::new();
+
         for line in output_data.lines() {
             let json_output: serde_json::Value =
                 serde_json::from_str(&line).expect("Error parsing JSON");
@@ -100,6 +105,26 @@ impl SecretTool {
                     continue;
                 }
             }
+            // Check if the detected secret is whitelisted
+            if !mongo_uri.is_empty() {
+                // Fetch whitelisted secrets from MongoDB
+                let whitelisted_secrets = match list_whitelisted_secrets(mongo_uri).await {
+                    Ok(secrets) => secrets,
+                    Err(e) => {
+                        eprintln!("Error fetching whitelisted secrets: {}", e);
+                        continue; // You might want to handle the error differently
+                    }
+                };
+
+                // Check if the detected secret is in the whitelisted secrets
+                if let Some(raw_value) = result["Raw"].as_str() {
+                    if whitelisted_secrets.contains(&raw_value.to_string()) {
+                        println!("[+] Skipping because {} is whitelisted...", raw_value);
+                        continue;
+                    }
+                }
+            }
+
             new_results.push(result.clone());
         }
         results = new_results;

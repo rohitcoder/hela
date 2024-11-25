@@ -9,6 +9,7 @@ use utils::pipeline;
 
 async fn execute_scan(
     scan_type: &str,
+    mongo_uri: &str,
     path: &str,
     base_branch: Option<&str>,
     pr_branch: Option<&str>,
@@ -28,6 +29,7 @@ async fn execute_scan(
 
     scanner
         .execute_scan(
+            mongo_uri,
             scan_type,
             path,
             base_branch,
@@ -188,6 +190,7 @@ async fn main() {
     if is_sast {
         execute_scan(
             "sast",
+            &mongo_uri,
             &path,
             Some(&base_branch),
             pr_branch_option,
@@ -204,6 +207,7 @@ async fn main() {
     if is_sca {
         execute_scan(
             "sca",
+            &mongo_uri,
             &path,
             Some(&base_branch),
             pr_branch_option,
@@ -220,6 +224,7 @@ async fn main() {
     if is_secret {
         execute_scan(
             "secret",
+            &mongo_uri,
             &path,
             Some(&base_branch),
             pr_branch_option,
@@ -236,6 +241,7 @@ async fn main() {
     if is_license_compliance {
         execute_scan(
             "license-compliance",
+            &mongo_uri,
             &path,
             Some(&base_branch),
             pr_branch_option,

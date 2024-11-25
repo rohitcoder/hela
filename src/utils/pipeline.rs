@@ -24,7 +24,6 @@ pub async fn pipeline_failure(
     product_name: String,
     engagement_name: String,
 ) {
-    // if code_path contains ghp_* thend redact that value because its token
     let redacted_code_path = redact_github_token(&code_path);
     // generate report in sarif format sast_result_sarif.json sca_result_sarif.json secret_result_sarif.json
     let mut total_issues = 0;

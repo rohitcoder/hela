@@ -26,6 +26,7 @@ impl ScanRunner {
 
     pub async fn execute_scan(
         &self,
+        mongo_uri: &str,
         scan_type: &str,
         path: &str,
         branch: Option<&str>,
@@ -53,7 +54,7 @@ impl ScanRunner {
             }
             "secret" => {
                 self.secret_tool
-                    .run_scan(path, branch, pr_branch, verbose)
+                    .run_scan(path, branch, pr_branch, mongo_uri, verbose)
                     .await
             }
             "license-compliance" => {

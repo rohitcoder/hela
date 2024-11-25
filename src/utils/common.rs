@@ -102,6 +102,30 @@ pub async fn bulk_check_hash_exists(
     Ok(existing_hashes)
 }
 
+pub async fn list_whitelisted_secrets(
+    mongo_uri: &str,
+) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    let client = connect_to_mongodb(mongo_uri, "code-security-open-source").await?;
+    let collection: Collection<Document> = client
+        .database("code-security-open-source")
+        .collection("secrets");
+
+    // Create the filter to match the secret
+    let mut cursor = collection.find(None, None).await?;
+    let mut secrets_list: HashSet<String> = HashSet::new(); // Make this mutable
+    while let Some(doc) = cursor.next().await {
+        match doc {
+            Ok(document) => {
+                if let Some(secret) = document.get_str("secret").ok() {
+                    secrets_list.insert(secret.to_string());
+                }
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(secrets_list) // Return the secrets_list
+}
+
 pub async fn register_hash(message: &str, mongo_uri: &str) {
     let hashed_message = hash_text(message);
     match connect_to_mongodb(mongo_uri, "code-security-open-source").await {
