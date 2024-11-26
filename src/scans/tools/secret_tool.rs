@@ -30,6 +30,7 @@ impl SecretTool {
                 let out = checkout(_path, "/tmp/app", _branch, pr_branch);
                 if out.is_err() {
                     println!("Error while cloning: {}", out.err().unwrap());
+                    std::process::exit(0);
                 }
             } else {
                 if verbose {

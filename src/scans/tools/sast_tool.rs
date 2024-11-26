@@ -36,18 +36,21 @@ impl SastTool {
                         let out = checkout(_path, "/tmp/app", base_branch, branch);
                         if out.is_err() {
                             println!("Error while cloning: {}", out.err().unwrap());
+                            std::process::exit(0);
                         }
                     } else {
                         let branch = Some(pr_branch);
                         let out = checkout(_path, "/tmp/app", None, branch);
                         if out.is_err() {
                             println!("Error while cloning: {}", out.err().unwrap());
+                            std::process::exit(0);
                         }
                     }
                 } else {
                     let out = checkout(_path, "/tmp/app", None, None);
                     if out.is_err() {
                         println!("Error while cloning: {}", out.err().unwrap());
+                        std::process::exit(0);
                     }
                 }
             } else {
