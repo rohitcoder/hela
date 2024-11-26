@@ -14,8 +14,8 @@ impl SastTool {
     pub async fn run_scan(
         &self,
         _path: &str,
-        _commit_id: Option<&str>,
-        _branch: Option<&str>,
+        base_branch: Option<&str>,
+        pr_branch: Option<&str>,
         rule_path: String,
         verbose: bool,
     ) {
@@ -23,22 +23,22 @@ impl SastTool {
         if verbose {
             println!("[+] Running SAST scan on path: {}", _path);
         }
-        println!("Commit ID: {:?}", _commit_id);
-        println!("Branch: {:?}", _branch);
+        println!("Base Branch: {:?}", base_branch);
+        println!("PR Branch: {:?}", pr_branch);
         if !std::path::Path::new("/tmp/app").exists() {
             if _path.starts_with("http") {
                 if verbose {
                     println!("[+] Cloning git repo...");
                 }
-                if let Some(_branch) = _branch {
-                    if _commit_id.is_some() {
-                        let branch = Some(_branch);
-                        let out = checkout(_path, "/tmp/app", _commit_id, branch);
+                if let Some(pr_branch) = pr_branch {
+                    if base_branch.is_some() {
+                        let branch = Some(pr_branch);
+                        let out = checkout(_path, "/tmp/app", base_branch, branch);
                         if out.is_err() {
                             println!("Error while cloning: {}", out.err().unwrap());
                         }
                     } else {
-                        let branch = Some(_branch);
+                        let branch = Some(pr_branch);
                         let out = checkout(_path, "/tmp/app", None, branch);
                         if out.is_err() {
                             println!("Error while cloning: {}", out.err().unwrap());
