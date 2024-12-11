@@ -63,7 +63,7 @@ impl SecretTool {
             }
         }
 
-        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO,GETRESPONSE,ATERA,GITTER,SONARCLOUD,AZURESEARCHADMINKEY,MYFRESHWORKS,BOX", _path);
+        let cmd = format!("trufflehog filesystem --no-update {} --json --exclude-detectors=FLOAT,SIGNABLE,YANDEX,OANDA,CIRCLE,PARSEUR,URI,SENTRYTOKEN,SIRV,ETSYAPIKEY,UNIFYID,MIRO,FRESHDESK,ALIBABA,YELP,FLATIO,GETRESPONSE,ATERA,GITTER,SONARCLOUD,AZURESEARCHADMINKEY,MYFRESHWORKS,BOX,GODADDY", _path);
         let output_data = execute_command(&cmd, true).await;
 
         let mut results: Vec<Value> = Vec::new();
