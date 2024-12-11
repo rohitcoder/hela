@@ -30,8 +30,8 @@ pub async fn pipeline_failure(
     let mut pipeline_sast_sca_data = HashMap::new();
     let mut pipeline_secret_license_data = HashMap::new();
     let mut found_issues = false;
-    let mut found_sast_issues = false;
-    let mut found_sca_issues = false;
+    let found_sast_issues = false;
+    let found_sca_issues = false;
     let mut found_secret_issues = false;
     let found_license_issues = false;
 
@@ -60,9 +60,7 @@ pub async fn pipeline_failure(
     if code_path.contains("@") {
         cleaned_code_path = code_path.split("@").collect::<Vec<&str>>()[1].to_string();
     }
-    let mut commit_path = String::new();
-    commit_path = format!("{}/commit", cleaned_code_path.clone());
-    slack_alert_msg.push_str(format!("\n\nCommit: {}", commit_path).as_str());
+    let commit_path = format!("{}/commit", cleaned_code_path.clone());
     println!(
         "\n\n 🔎 Hela Security Scan Results for {}",
         redacted_code_path
@@ -90,12 +88,10 @@ pub async fn pipeline_failure(
             };
             let vuln_path_str = format!("{}:{}", vuln_path_result, vuln_path_line);
             let vuln_path = String::from(vuln_path_str);
-            let commit_id =
-                find_commit_for_snippet(&vuln_path, &result["extra"]["lines"].to_string()).unwrap();
             sast_result.insert("check_id", result["check_id"].to_string());
             sast_result.insert("path", vuln_path);
             sast_result.insert("severity", result["extra"]["severity"].to_string());
-            let mut message = result["extra"]["message"].to_string();
+            let message = result["extra"]["message"].to_string();
             sast_result.insert("message", message);
             sast_result.insert("lines", result["extra"]["lines"].to_string());
 
@@ -135,8 +131,6 @@ pub async fn pipeline_failure(
         }
 
         table.add_row(row![bFg->"S.No", bFg->"Path", bFg->"Severity", bFg->"Message"]);
-        let mut sast_count = 0;
-        let mut messages: Vec<String> = Vec::new();
         let mut message_to_hash: HashMap<String, (String, String, String, String, String)> =
             HashMap::new();
 
@@ -477,11 +471,11 @@ pub async fn pipeline_failure(
             slack_alert_msg.push_str("\n\n");
             slack_alert_msg.push_str("================== Secret Results ==================");
             table.add_row(
-                row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name"],
+                row![bFg->"S.No", bFg->"File", bFg->"Line", bFg->"Raw", bFg->"Detector Name", bFg->"Commit"],
             );
         }
 
-        let mut secret_count = 0;
+        let secret_count = 0;
         let mut message_to_hash: HashMap<String, (String, String, String, String, String)> =
             HashMap::new();
 
@@ -544,11 +538,22 @@ pub async fn pipeline_failure(
                 let raw_truncated = raw.chars().take(50).collect::<String>();
 
                 // Add row to table
-                table.add_row(row![secret_count, file, line, raw_truncated, detector_name]);
+                table.add_row(row![
+                    secret_count,
+                    file,
+                    line,
+                    raw_truncated,
+                    detector_name,
+                    commit_link
+                ]);
 
                 slack_alert_msg.push_str(&format!(
                     "\n\nFile: {}\nLine: {}\nRaw: {}\nDetector Name: {}\nCommit: {}",
-                    file, line, raw, detector_name, commit_link
+                    file,
+                    line,
+                    raw,
+                    detector_name,
+                    commit_link.clone()
                 ));
 
                 // Register the missing hash
@@ -759,6 +764,20 @@ pub async fn pipeline_failure(
     if is_secret {
         let mut secret_results = Vec::new();
         for result in json_output["secret"]["results"].as_array().unwrap() {
+            let file_path = result["SourceMetadata"]["Data"]["Filesystem"]["file"]
+                .as_str()
+                .unwrap();
+            let raw_value = result["Raw"].as_str().unwrap();
+            let commit_id = find_commit_for_snippet(file_path, raw_value).unwrap();
+            let commit_base_link = commit_path.split("/commit").collect::<Vec<&str>>()[0];
+            let commit_link = format!(
+                "{}/commit/{}",
+                commit_base_link,
+                match commit_id {
+                    Some(commit_id) => commit_id,
+                    None => "UNKNOWN".to_string(),
+                }
+            );
             let mut secret_result = serde_json::Map::new();
             secret_result.insert(
                 "ruleId".to_string(),
@@ -769,7 +788,7 @@ pub async fn pipeline_failure(
                 "Secret of {} with value {} exposed\n\nCommit: {}",
                 result["DetectorName"].as_str().unwrap(),
                 result["Raw"].as_str().unwrap(),
-                commit_path
+                commit_link
             );
             let msg_val = serde_json::Value::String(msg);
             message.insert("text".to_string(), msg_val);
