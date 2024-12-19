@@ -439,12 +439,12 @@ fn save_pr_branch_files(
 pub fn set_git_global_user_config() -> Result<(), Box<dyn std::error::Error>> {
     // Set global email
     Command::new("git")
-        .args(&["config", "--global", "user.email", "helabot@groww.in"])
+        .args(&["config", "--global", "user.email", "rohitcoder@github.com"])
         .output()?;
 
     // Set global name
     Command::new("git")
-        .args(&["config", "--global", "user.name", "Hela Bot"])
+        .args(&["config", "--global", "user.name", "rohitcoder"])
         .output()?;
 
     Ok(())
